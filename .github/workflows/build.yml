@@ -12,12 +12,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install ldid via Homebrew
+      - name: Install ldid
         run: |
-          brew update
           brew install ldid
-          which ldid
-          sudo ln -sf $(which ldid) /usr/local/bin/ldid
+          echo "$(brew --prefix)/bin" >> $GITHUB_PATH
 
       - name: Setup Theos
         run: |
