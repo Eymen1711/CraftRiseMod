@@ -1,3 +1,4 @@
+ADDITIONAL_CFLAGS = -Wno-error=deprecated-declarations
 TARGET := iphone:clang:latest:14.0
 ARCHS := arm64
 
