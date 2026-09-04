@@ -12,9 +12,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
+      - name: Install ldid Manually
         run: |
-          brew install ldid
+          sudo wget -qO /usr/local/bin/ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid.macos.arm64 || sudo curl -L -o /usr/local/bin/ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid.macos.arm64
+          sudo chmod +x /usr/local/bin/ldid
 
       - name: Setup Theos
         run: |
