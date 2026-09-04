@@ -1,0 +1,8 @@
+Package: com.eymo.craftrisemod
+Name: CraftRiseMod
+Depends: mobilesubstrate
+Version: 1.0.0
+Architecture: iphoneos-arm
+Maintainer: eymo
+Author: eymo
+Section: Tweaks
