@@ -124,7 +124,7 @@ void new_PlayerController_Update(id self, SEL _cmd) {
     
     // --- 360 SpinBot (Sadece Buton) ---
     UIButton *aimButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    aimButton.frame = CGRectMake(15, 240, 250, 38];
+    aimButton.frame = CGRectMake(15, 240, 250, 38);
     [aimButton setTitle:@"360 SpinBot: OFF" forState:UIControlStateNormal];
     [aimButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     aimButton.backgroundColor = [UIColor redColor];
@@ -134,7 +134,7 @@ void new_PlayerController_Update(id self, SEL _cmd) {
     
     // --- Macro Block (Sadece Buton - Ayrı) ---
     UIButton *blockMacroButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    blockMacroButton.frame = CGRectMake(15, 290, 250, 38];
+    blockMacroButton.frame = CGRectMake(15, 290, 250, 38);
     [blockMacroButton setTitle:@"Macro Block: OFF" forState:UIControlStateNormal];
     [blockMacroButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     blockMacroButton.backgroundColor = [UIColor redColor];
