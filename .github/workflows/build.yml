@@ -15,7 +15,7 @@ jobs:
       - name: Install ldid
         run: |
           brew install ldid
-          echo "$(brew --prefix)/bin" >> $GITHUB_PATH
+          sudo ln -sf $(brew --prefix)/bin/ldid /usr/local/bin/ldid
 
       - name: Setup Theos
         run: |
@@ -24,7 +24,7 @@ jobs:
 
       - name: Fix Line Endings
         run: |
-          find . -type f -exec dos2unix {} + || find . -type f -exec sed -i '' -e 's/\r$//' {} +
+          find . -type f -exec sed -i '' -e 's/\r$//' {} +
 
       - name: Build Package
         run: |
