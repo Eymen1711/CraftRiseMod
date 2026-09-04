@@ -1,4 +1,6 @@
 #import <UIKit/UIKit.h>
+#import <objc/runtime.h>
+#import <UIKit/UIKit.h>
 
 // Özellik Değişkenleri ve Mesafeler (Slider Değerleri)
 static bool isKillAuraEnabled = false;
