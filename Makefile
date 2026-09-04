@@ -6,6 +6,6 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME := CraftRiseMod
 
 CraftRiseMod_FILES := Tweak.xm
-CraftRiseMod_CFLAGS := -fobjc-arc -Wno-deprecated-declarations
+CraftRiseMod_CFLAGS := -fno-objc-arc -Wno-deprecated-declarations
 
 include $(THEOS_MAKE_PATH)/tweak.mk
