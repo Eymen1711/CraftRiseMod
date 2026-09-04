@@ -30,3 +30,9 @@ jobs:
       - name: Build Package
         run: |
           make package
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CraftRiseMod-deb
+          path: packages/*.deb
