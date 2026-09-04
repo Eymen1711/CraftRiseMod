@@ -16,7 +16,6 @@ jobs:
         run: |
           brew install ldid
           sudo ln -sf $(brew --prefix)/bin/ldid /usr/local/bin/ldid
-          sudo ln -sf $(brew --prefix)/bin/ldid $(which ldid || echo "/usr/local/bin/ldid")
 
       - name: Setup Theos
         run: |
