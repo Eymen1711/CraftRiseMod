@@ -1,142 +1,257 @@
 #import <UIKit/UIKit.h>
 
-static UIWindow *vealixWindow = nil;
-static UIButton *vealixToggleBtn = nil;
-static UIView *vealixMenu = nil;
+static UIWindow *vealixSharedWindow = nil;
+static UIButton *vealixMenuBtn = nil;
+static UIView *vealixPanel = nil;
+static BOOL isMenuOpen = NO;
 
-@interface VealixTouchHandler : UIButton
-@property (nonatomic, copy) void (^tapAction)(void);
+// Değer göstergeleri için etiket referansları
+static UILabel *killauraValLbl = nil;
+static UILabel *aimbotValLbl = nil;
+
+// Oyunun dokunmaları yutmasını engelleyen güvenli buton sınıfı
+@interface VealixButton : UIButton
 @end
 
-@implementation VealixTouchHandler
+@implementation VealixButton
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     [super touchesEnded:touches withEvent:event];
-    if (self.tapAction) {
-        self.tapAction();
+    isMenuOpen = !isMenuOpen;
+    if (vealixPanel) {
+        vealixPanel.hidden = !isMenuOpen;
     }
 }
 @end
 
-static void SetupVeaLixUI() {
-    if (vealixWindow) return;
+// Slider değerleri değiştiğinde çalışacak metotlar
+@interface VealixActions : NSObject
++bouncer;
+@end
+@implementation VealixActions
++ (void)sliderChangedKillAura:(UISlider *)sender {
+    if (killauraValLbl) {
+        killauraValLbl.text = [NSString stringWithFormat:@"%.0fm", sender.value];
+    }
+}
++ (void)sliderChangedAimbot:(UISlider *)sender {
+    if (aimbotValLbl) {
+        aimbotValLbl.text = [NSString stringWithFormat:@"%.0fm", sender.value];
+    }
+}
+@end
 
-    UIWindowScene *targetScene = nil;
+static void BuildVeaLixInterface() {
+    if (vealixSharedWindow) return;
+
+    UIWindow *targetWindow = nil;
     if (@available(iOS 13.0, *)) {
         for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
             if (scene.activationState == UISceneActivationStateForegroundActive) {
-                targetScene = scene;
-                break;
+                for (UIWindow *win in scene.windows) {
+                    if (win.isKeyWindow) {
+                        targetWindow = win;
+                        break;
+                    }
+                }
             }
         }
     }
-
-    if (@available(iOS 13.0, *)) {
-        if (targetScene) {
-            vealixWindow = [[UIWindow alloc] initWithWindowScene:targetScene];
-        } else {
-            vealixWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-        }
-    } else {
-        vealixWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    if (!targetWindow) {
+        targetWindow = [UIApplication sharedApplication].keyWindow;
     }
+    if (!targetWindow || !targetWindow.rootViewController) return;
 
-    vealixWindow.windowLevel = UIWindowLevelAlert + 99999;
-    vealixWindow.backgroundColor = [UIColor clearColor];
-    vealixWindow.hidden = NO;
+    UIViewController *rootVC = targetWindow.rootViewController;
 
-    UIViewController *emptyVC = [[UIViewController alloc] init];
-    emptyVC.view.backgroundColor = [UIColor clearColor];
-    vealixWindow.rootViewController = emptyVC;
+    // Şeffaf Container Katmanı
+    UIView *containerView = [[UIView alloc] initWithFrame:rootVC.view.bounds];
+    containerView.backgroundColor = [UIColor clearColor];
+    containerView.userInteractionEnabled = YES;
+    [rootVC.view addSubview:containerView];
+    [rootVC.view bringSubviewToFront:containerView];
 
-    // 1. ANA TOGGLE BUTONU (Sol Üst)
-    VealixTouchHandler *toggleBtn = [VealixTouchHandler buttonWithType:UIButtonTypeCustom];
-    toggleBtn.frame = CGRectMake(40, 60, 65, 65);
-    toggleBtn.backgroundColor = [UIColor colorWithRed:0.04 green:0.04 blue:0.06 alpha:0.95];
-    toggleBtn.layer.cornerRadius = 32.5;
-    toggleBtn.layer.borderWidth = 2.0;
-    toggleBtn.layer.borderColor = [UIColor colorWithRed:0.0 green:0.95 blue:0.99 alpha:1.0].CGColor;
+    // 1. Ana Toggle Butonu (Sol Üst)
+    VealixButton *btn = [VealixButton buttonWithType:UIButtonTypeCustom];
+    btn.frame = CGRectMake(35, 55, 65, 65);
+    btn.backgroundColor = [UIColor colorWithRed:0.04 green:0.04 blue:0.06 alpha:0.95];
+    btn.layer.cornerRadius = 32.5;
+    btn.layer.borderWidth = 2.0;
+    btn.layer.borderColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0].CGColor;
     
-    // Gölge
-    toggleBtn.layer.shadowColor = [UIColor colorWithRed:0.0 green:0.95 blue:0.99 alpha:0.7].CGColor;
-    toggleBtn.layer.shadowOffset = CGSizeZero;
-    toggleBtn.layer.shadowRadius = 8.0;
-    toggleBtn.layer.shadowOpacity = 1.0;
+    btn.layer.shadowColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:0.6].CGColor;
+    btn.layer.shadowOffset = CGSizeZero;
+    btn.layer.shadowRadius = 6.0;
+    btn.layer.shadowOpacity = 1.0;
 
-    [toggleBtn setTitle:@"VEALIX\nHACK" forState:UIControlStateNormal];
-    toggleBtn.titleLabel.font = [UIFont boldSystemFontOfSize:9];
-    toggleBtn.titleLabel.numberOfLines = 2;
-    toggleBtn.titleLabel.textAlignment = NSTextAlignmentCenter;
-    [toggleBtn setTitleColor:[UIColor colorWithRed:0.0 green:0.95 blue:0.99 alpha:1.0] forState:UIControlStateNormal];
+    [btn setTitle:@"VEALIX\nHACK" forState:UIControlStateNormal];
+    btn.titleLabel.font = [UIFont boldSystemFontOfSize:9];
+    btn.titleLabel.numberOfLines = 2;
+    btn.titleLabel.textAlignment = NSTextAlignmentCenter;
+    [btn setTitleColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
 
-    // 2. MENÜ PANELİ
-    UIView *menuView = [[UIView alloc] initWithFrame:CGRectMake(40, 140, 280, 320)];
-    menuView.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.08 alpha:0.98];
-    menuView.layer.cornerRadius = 16;
-    menuView.layer.borderWidth = 1.0;
-    menuView.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.15].CGColor;
-    menuView.hidden = YES; // Başta gizli
-    vealixMenu = menuView;
+    // 2. Tam Donanımlı Menü Paneli (Slider'lar dahil genişletilmiş boyut)
+    UIView *panel = [[UIView alloc] initWithFrame:CGRectMake(35, 135, 280, 480)];
+    panel.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.09 alpha:0.97];
+    panel.layer.cornerRadius = 16;
+    panel.layer.borderWidth = 1.0;
+    panel.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.18].CGColor;
+    panel.hidden = YES; // Başlangıçta gizli
 
-    // Menü Başlığı
-    UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 180, 25)];
-    titleLabel.text = @"VeaLixHack v2.0";
-    titleLabel.font = [UIFont boldSystemFontOfSize:14];
-    titleLabel.textColor = [UIColor colorWithRed:0.0 green:0.95 blue:0.99 alpha:1.0];
-    [menuView addSubview:titleLabel];
+    // Başlık
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 170, 25)];
+    title.text = @"VeaLixHack v2.0";
+    title.font = [UIFont boldSystemFontOfSize:14];
+    title.textColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
+    [panel addSubview:title];
 
     // TikTok Rozeti
-    UILabel *badgeLabel = [[UILabel alloc] initWithFrame:CGRectMake(190, 12, 75, 22)];
-    badgeLabel.text = @"vealixbl";
-    badgeLabel.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
-    badgeLabel.textColor = [UIColor lightGrayColor];
-    badgeLabel.textAlignment = NSTextAlignmentCenter;
-    badgeLabel.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.06];
-    badgeLabel.layer.cornerRadius = 6;
-    badgeLabel.layer.masksToBounds = YES;
-    [menuView addSubview:badgeLabel];
+    UILabel *badge = [[UILabel alloc] initWithFrame:CGRectMake(190, 12, 75, 22)];
+    badge.text = @"vealixbl";
+    badge.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
+    badge.textColor = [UIColor lightGrayColor];
+    badge.textAlignment = NSTextAlignmentCenter;
+    badge.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.06];
+    badge.layer.cornerRadius = 6;
+    badge.layer.masksToBounds = YES;
+    [panel addSubview:badge];
 
-    // Özellik Satırı Oluşturan Yardımcı Blok/Fonksiyon Mantığı (ESP Örneği)
-    CGFloat startY = 50;
-    NSArray *features = @[@"ESP", @"Kill Aura", @"Aimbot", @"Attack Macro", @"SpinBot"];
+    CGFloat startY = 48;
+
+    // --- 1. ESP ---
+    UIView *rowESP = [[UIView alloc] initWithFrame:CGRectMake(12, startY, 256, 42)];
+    rowESP.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    rowESP.layer.cornerRadius = 8;
+    rowESP.layer.borderWidth = 1.0;
+    rowESP.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.05].CGColor;
+    UILabel *lblESP = [[UILabel alloc] initWithFrame:CGRectMake(12, 11, 150, 20)];
+    lblESP.text = @"ESP";
+    lblESP.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    lblESP.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
+    [rowESP addSubview:lblESP];
+    UISwitch *swESP = [[UISwitch alloc] initWithFrame:CGRectMake(195, 6, 50, 30)];
+    [swESP setOnTintColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0]];
+    [rowESP addSubview:swESP];
+    [panel addSubview:rowESP];
+
+    // --- 2. Kill Aura (+ Slider) ---
+    UIView *rowKA = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 50, 256, 80)];
+    rowKA.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    rowKA.layer.cornerRadius = 8;
+    rowKA.layer.borderWidth = 1.0;
+    rowKA.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.05].CGColor;
     
-    for (int i = 0; i < features.count; i++) {
-        UIView *rowBg = [[UIView alloc] initWithFrame:CGRectMake(12, startY + (i * 48), 256, 40)];
-        rowBg.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
-        rowBg.layer.cornerRadius = 8;
-        rowBg.layer.borderWidth = 1.0;
-        rowBg.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.05].CGColor;
-
-        UILabel *nameLbl = [[UILabel alloc] initWithFrame:CGRectMake(12, 10, 150, 20)];
-        nameLbl.text = features[i];
-        nameLbl.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-        nameLbl.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
-        [rowBg addSubview:nameLbl];
-
-        UISwitch *sw = [[UISwitch alloc] initWithFrame:CGRectMake(195, 4, 50, 30)];
-        [sw setOnTintColor:[UIColor colorWithRed:0.0 green:0.95 blue:0.99 alpha:1.0]];
-        [rowBg addSubview:sw];
-
-        [menuView addSubview:rowBg];
-    }
-
-    // Toggle Butonuna Tıklama Aksiyonu (Menüyü aç/kapat)
-    toggleBtn.tapAction = ^{
-        menuView.hidden = !menuView.hidden;
-    };
-
-    [emptyVC.view addSubview:toggleBtn];
-    [emptyVC.view addSubview:menuView];
+    UILabel *lblKA = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, 100, 20)];
+    lblKA.text = @"Kill Aura";
+    lblKA.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    lblKA.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
+    [rowKA addSubview:lblKA];
     
-    vealixToggleBtn = toggleBtn;
+    UISwitch *swKA = [[UISwitch alloc] initWithFrame:CGRectMake(195, 4, 50, 30)];
+    [swKA setOnTintColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0]];
+    [rowKA addSubview:swKA];
+
+    UILabel *lblKAMsg = [[UILabel alloc] initWithFrame:CGRectMake(12, 34, 100, 15)];
+    lblKAMsg.text = @"Mesafe Algılama";
+    lblKAMsg.font = [UIFont systemFontOfSize:9];
+    lblKAMsg.textColor = [UIColor lightGrayColor];
+    [rowKA addSubview:lblKAMsg];
+
+    killauraValLbl = [[UILabel alloc] initWithFrame:CGRectMake(195, 34, 50, 15)];
+    killauraValLbl.text = @"20m";
+    killauraValLbl.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
+    killauraValLbl.textColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
+    killauraValLbl.textAlignment = NSTextAlignmentRight;
+    [rowKA addSubview:killauraValLbl];
+
+    UISlider *sliderKA = [[UISlider alloc] initWithFrame:CGRectMake(12, 52, 232, 20)];
+    sliderKA.minimumValue = 1;
+    sliderKA.maximumValue = 50;
+    sliderKA.value = 20;
+    sliderKA.minimumTrackTintColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
+    [sliderKA addTarget:[VealixActions class] action:@selector(sliderChangedKillAura:) forControlEvents:UIControlEventValueChanged];
+    [rowKA addSubview:sliderKA];
+    [panel addSubview:rowKA];
+
+    // --- 3. Aimbot (+ Slider) ---
+    UIView *rowAim = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 138, 256, 80)];
+    rowAim.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    rowAim.layer.cornerRadius = 8;
+    rowAim.layer.borderWidth = 1.0;
+    rowAim.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.05].CGColor;
+    
+    UILabel *lblAim = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, 100, 20)];
+    lblAim.text = @"Aimbot";
+    lblAim.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    lblAim.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
+    [rowAim addSubview:lblAim];
+    
+    UISwitch *swAim = [[UISwitch alloc] initWithFrame:CGRectMake(195, 4, 50, 30)];
+    [swAim setOnTintColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0]];
+    [rowAim addSubview:swAim];
+
+    UILabel *lblAimMsg = [[UILabel alloc] initWithFrame:CGRectMake(12, 34, 100, 15)];
+    lblAimMsg.text = @"Mesafe Algılama";
+    lblAimMsg.font = [UIFont systemFontOfSize:9];
+    lblAimMsg.textColor = [UIColor lightGrayColor];
+    [rowAim addSubview:lblAimMsg];
+
+    aimbotValLbl = [[UILabel alloc] initWithFrame:CGRectMake(195, 34, 50, 15)];
+    aimbotValLbl.text = @"20m";
+    aimbotValLbl.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
+    aimbotValLbl.textColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
+    aimbotValLbl.textAlignment = NSTextAlignmentRight;
+    [rowAim addSubview:aimbotValLbl];
+
+    UISlider *sliderAim = [[UISlider alloc] initWithFrame:CGRectMake(12, 52, 232, 20)];
+    sliderAim.minimumValue = 1;
+    sliderAim.maximumValue = 50;
+    sliderAim.value = 20;
+    sliderAim.minimumTrackTintColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
+    [sliderAim addTarget:[VealixActions class] action:@selector(sliderChangedAimbot:) forControlEvents:UIControlEventValueChanged];
+    [rowAim addSubview:sliderAim];
+    [panel addSubview:rowAim];
+
+    // --- 4. Attack Macro ---
+    UIView *rowAM = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 226, 256, 42)];
+    rowAM.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    rowAM.layer.cornerRadius = 8;
+    rowAM.layer.borderWidth = 1.0;
+    rowAM.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.05].CGColor;
+    UILabel *lblAM = [[UILabel alloc] initWithFrame:CGRectMake(12, 11, 150, 20)];
+    lblAM.text = @"Attack Macro (50 CPS)";
+    lblAM.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    lblAM.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
+    [rowAM addSubview:lblAM];
+    UISwitch *swAM = [[UISwitch alloc] initWithFrame:CGRectMake(195, 6, 50, 30)];
+    [swAM setOnTintColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0]];
+    [rowAM addSubview:swAM];
+    [panel addSubview:rowAM];
+
+    // --- 5. SpinBot ---
+    UIView *rowSB = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 274, 256, 42)];
+    rowSB.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    rowSB.layer.cornerRadius = 8;
+    rowSB.layer.borderWidth = 1.0;
+    rowSB.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.05].CGColor;
+    UILabel *lblSB = [[UILabel alloc] initWithFrame:CGRectMake(12, 11, 150, 20)];
+    lblSB.text = @"360 SpinBot";
+    lblSB.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    lblSB.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
+    [rowSB addSubview:lblSB];
+    UISwitch *swSB = [[UISwitch alloc] initWithFrame:CGRectMake(195, 6, 50, 30)];
+    [swSB setOnTintColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0]];
+    [rowSB addSubview:swSB];
+    [panel addSubview:rowSB];
+
+    [containerView addSubview:btn];
+    [containerView addSubview:panel];
+
+    vealixMenuBtn = btn;
+    vealixPanel = panel;
 }
 
 %ctor {
-    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidFinishLaunchingNotification
-                                                      object:nil
-                                                       queue:[NSOperationQueue mainQueue]
-                                                  usingBlock:^(NSNotification *note) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            SetupVeaLixUI();
-        });
-    }];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        BuildVeaLixInterface();
+    });
 }
