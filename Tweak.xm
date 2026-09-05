@@ -8,13 +8,21 @@ static BOOL isMenuOpen = NO;
 static UILabel *killauraValLbl = nil;
 static UILabel *aimbotValLbl = nil;
 
-// Dokunmaları ve sürüklemeyi doğrudan yöneten özel pencere sınıfı
+// Dokunmaları sadece UI elemanlarının üzerindeyken yakalayan, boşluklarda oyuna geçiren akıllı pencere
 @interface VealixTouchWindow : UIWindow
 @end
 
 @implementation VealixTouchWindow
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    return YES; // Pencere içindeki her dokunmayı kesinlikle yakala
+    // Eğer buton veya menü paneli dokunulan sınırların içindeyse dokunmayı biz alalım
+    if (vealixMenuBtn && [vealixMenuBtn pointInside:[vealixMenuBtn convertPoint:point fromWindow:self] withEvent:event]) {
+        return YES;
+    }
+    if (isMenuOpen && vealixPanel && [vealixPanel pointInside:[vealixPanel convertPoint:point fromWindow:self] withEvent:event]) {
+        return YES;
+    }
+    // Değilse dokunmayı arkadaki oyuna aynen salalım (oyun oynanabilsin)
+    return NO;
 }
 @end
 
@@ -66,7 +74,6 @@ static UILabel *aimbotValLbl = nil;
 static void BuildVeaLixInterface() {
     if (vealixWindow) return;
 
-    // Oyundan tamamen bağımsız, en üst katmanda özel pencere oluşturuyoruz
     if (@available(iOS 13.0, *)) {
         for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
             if (scene.activationState == UISceneActivationStateForegroundActive) {
