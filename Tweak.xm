@@ -1,31 +1,41 @@
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
 
+static UIWindow *vealixWindow = nil;
 static WKWebView *vealixWebView = nil;
 
 static void SetupVeaLixUI() {
-    if (vealixWebView) return;
+    if (vealixWindow) return;
 
-    UIWindow *keyWindow = nil;
+    UIWindowScene *targetScene = nil;
     if (@available(iOS 13.0, *)) {
         for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
             if (scene.activationState == UISceneActivationStateForegroundActive) {
-                for (UIWindow *win in scene.windows) {
-                    if (win.isKeyWindow) {
-                        keyWindow = win;
-                        break;
-                    }
-                }
+                targetScene = scene;
+                break;
             }
         }
     }
-    if (!keyWindow) {
-        keyWindow = [UIApplication sharedApplication].keyWindow;
-    }
-    if (!keyWindow || !keyWindow.rootViewController) return;
 
-    UIViewController *rootVC = keyWindow.rootViewController;
-    CGRect screenBounds = rootVC.view.bounds;
+    if (@available(iOS 13.0, *)) {
+        if (targetScene) {
+            vealixWindow = [[UIWindow alloc] initWithWindowScene:targetScene];
+        } else {
+            vealixWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+        }
+    } else {
+        vealixWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    }
+
+    vealixWindow.windowLevel = UIWindowLevelAlert + 1; // Oyunun her katmanının en üstünde yer alır
+    vealixWindow.backgroundColor = [UIColor clearColor];
+    vealixWindow.hidden = NO;
+
+    UIViewController *emptyVC = [[UIViewController alloc] init];
+    emptyVC.view.backgroundColor = [UIColor clearColor];
+    vealixWindow.rootViewController = emptyVC;
+
+    CGRect screenBounds = emptyVC.view.bounds;
 
     WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
     config.allowsInlineMediaPlayback = YES;
@@ -33,7 +43,7 @@ static void SetupVeaLixUI() {
     vealixWebView = [[WKWebView alloc] initWithFrame:screenBounds configuration:config];
     vealixWebView.backgroundColor = [UIColor clearColor];
     vealixWebView.opaque = NO;
-    vealixWebView.userInteractionEnabled = YES; // Dokunmaların engellenmesini kesin olarak önler
+    vealixWebView.userInteractionEnabled = YES;
     vealixWebView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     vealixWebView.scrollView.scrollEnabled = NO;
 
@@ -148,10 +158,7 @@ static void SetupVeaLixUI() {
     "</html>";
 
     [vealixWebView loadHTMLString:htmlContent baseURL:nil];
-    
-    // Oyun pencerelerinin altına gömülmemesi için doğrudan view'ın en üst katmanına (subview olarak) ekliyoruz
-    [rootVC.view addSubview:vealixWebView];
-    [rootVC.view bringSubviewToFront:vealixWebView];
+    [emptyVC.view addSubview:vealixWebView];
 }
 
 %ctor {
