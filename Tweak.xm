@@ -64,7 +64,6 @@ static UILabel *aimbotValLbl = nil;
     CGFloat halfH = panel.bounds.size.height / 2;
     CGSize screenSz = panel.superview.bounds.size;
     
-    // Ekran dışına tamamen taşmasını engelle
     newCenter.x = MAX(halfW, MIN(screenSz.width - halfW, newCenter.x));
     newCenter.y = MAX(halfH, MIN(screenSz.height - halfH, newCenter.y));
     
@@ -97,11 +96,12 @@ static void BuildVeaLixInterface() {
     vc.view.userInteractionEnabled = YES;
     vealixWindow.rootViewController = vc;
 
-    // 3 Parmak 3 Kez Dokunma Algılayıcısı
+    // 3 Parmak 3 Kez Dokunma Algılayıcısını Doğrudan Pencereye Ekliyoruz
     UITapGestureRecognizer *tripleTap = [[UITapGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handleThreeFingerTripleTap:)];
     tripleTap.numberOfTouchesRequired = 3;
     tripleTap.numberOfTapsRequired = 3;
-    [vc.view addGestureRecognizer:tripleTap];
+    tripleTap.cancelsTouchesInView = NO;
+    [vealixWindow addGestureRecognizer:tripleTap];
 
     // Menü Paneli
     CGFloat screenW = [UIScreen mainScreen].bounds.size.width;
@@ -113,7 +113,6 @@ static void BuildVeaLixInterface() {
     panel.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.18].CGColor;
     panel.hidden = YES;
 
-    // Paneli Sürükleme (Yüzme) Özelliği
     UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handlePanelPan:)];
     [panel addGestureRecognizer:panelPan];
 
@@ -123,7 +122,6 @@ static void BuildVeaLixInterface() {
     title.textColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
     [panel addSubview:title];
 
-    // Kapatma Çarpı Butonu
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     closeBtn.frame = CGRectMake(240, 10, 30, 30);
     [closeBtn setTitle:@"✕" forState:UIControlStateNormal];
