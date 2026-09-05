@@ -1,6 +1,7 @@
 #import <UIKit/UIKit.h>
 
 static UIWindow *vealixWindow = nil;
+static UIButton *vealixFloatBtn = nil;
 static UIView *vealixPanel = nil;
 static BOOL isMenuOpen = NO;
 
@@ -12,11 +13,13 @@ static UILabel *aimbotValLbl = nil;
 
 @implementation VealixTouchWindow
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    if (isMenuOpen && vealixPanel) {
-        CGPoint panelPoint = [self convertPoint:point toView:vealixPanel];
-        if ([vealixPanel pointInside:panelPoint withEvent:event]) {
-            return YES;
-        }
+    if (vealixFloatBtn && !vealixFloatBtn.hidden) {
+        CGPoint p1 = [self convertPoint:point toView:vealixFloatBtn];
+        if ([vealixFloatBtn pointInside:p1 withEvent:event]) return YES;
+    }
+    if (isMenuOpen && vealixPanel && !vealixPanel.hidden) {
+        CGPoint p2 = [self convertPoint:point toView:vealixPanel];
+        if ([vealixPanel pointInside:p2 withEvent:event]) return YES;
     }
     return NO;
 }
@@ -25,8 +28,8 @@ static UILabel *aimbotValLbl = nil;
 @interface VealixActions : NSObject
 + (void)sliderChangedKillAura:(UISlider *)sender;
 + (void)sliderChangedAimbot:(UISlider *)sender;
-+ (void)closeMenu:(UIButton *)sender;
-+ (void)handleThreeFingerTripleTap:(UITapGestureRecognizer *)gesture;
++ (void)toggleMenu:(UIButton *)sender;
++ (void)handleFloatPan:(UIPanGestureRecognizer *)gesture;
 + (void)handlePanelPan:(UIPanGestureRecognizer *)gesture;
 @end
 
@@ -41,21 +44,31 @@ static UILabel *aimbotValLbl = nil;
         aimbotValLbl.text = [NSString stringWithFormat:@"%.0fm", sender.value];
     }
 }
-+ (void)closeMenu:(UIButton *)sender {
-    isMenuOpen = NO;
++ (void)toggleMenu:(UIButton *)sender {
+    isMenuOpen = !isMenuOpen;
     if (vealixPanel) {
-        vealixPanel.hidden = YES;
+        vealixPanel.hidden = !isMenuOpen;
     }
 }
-+ (void)handleThreeFingerTripleTap:(UITapGestureRecognizer *)gesture {
-    if (gesture.state == UIGestureRecognizerStateRecognized) {
-        isMenuOpen = !isMenuOpen;
-        if (vealixPanel) {
-            vealixPanel.hidden = !isMenuOpen;
-        }
-    }
++ (void)handleFloatPan:(UIPanGestureRecognizer *)gesture {
+    UIButton *btn = (UIButton *)gesture.view;
+    CGPoint translation = [gesture translationInView:btn.superview];
+    CGPoint newCenter = CGPointMake(btn.center.x + translation.x, btn.center.y + translation.y);
+    
+    CGFloat halfW = btn.bounds.size.width / 2;
+    CGFloat halfH = btn.bounds.size.height / 2;
+    CGSize screenSz = btn.superview.bounds.size;
+    
+    newCenter.x = MAX(halfW, MIN(screenSz.width - halfW, newCenter.x));
+    newCenter.y = MAX(halfH, MIN(screenSz.height - halfH, newCenter.y));
+    
+    btn.center = newCenter;
+    [gesture setTranslation:CGPointZero inView:btn.superview];
 }
-+ (void)handlePanelPan:(UIPanGestureRecognizer *)gesture {
++ (void)handlePanelPan:(UIPanGestureRecognizer -> *)gesture {
+    // compatibility fix for signature
+}
++ (void)handlePanelPanGesture:(UIPanGestureRecognizer *)gesture {
     UIView *panel = gesture.view;
     CGPoint translation = [gesture translationInView:panel.superview];
     CGPoint newCenter = CGPointMake(panel.center.x + translation.x, panel.center.y + translation.y);
@@ -69,6 +82,13 @@ static UILabel *aimbotValLbl = nil;
     
     panel.center = newCenter;
     [gesture setTranslation:CGPointZero inView:panel.superview];
+}
+@end
+
+// Düzenlenen pan panelli method yönlendirmesi
+@implementation VealixActions (PanFix)
++ (void)handlePanelPan:(UIPanGestureRecognizer *)gesture {
+    [self handlePanelPanGesture:gesture];
 }
 @end
 
@@ -96,64 +116,98 @@ static void BuildVeaLixInterface() {
     vc.view.userInteractionEnabled = YES;
     vealixWindow.rootViewController = vc;
 
-    // 3 Parmak 3 Kez Dokunma Algılayıcısını Doğrudan Pencereye Ekliyoruz
-    UITapGestureRecognizer *tripleTap = [[UITapGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handleThreeFingerTripleTap:)];
-    tripleTap.numberOfTouchesRequired = 3;
-    tripleTap.numberOfTapsRequired = 3;
-    tripleTap.cancelsTouchesInView = NO;
-    [vealixWindow addGestureRecognizer:tripleTap];
+    // Yüzen Menü Tuşu (Görseldeki Neon Mavi Tarzda)
+    UIButton *floatBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    floatBtn.frame = CGRectMake(30, 80, 50, 50);
+    floatBtn.backgroundColor = [UIColor colorWithRed:0.01 green:0.01 blue:0.02 alpha:0.92];
+    floatBtn.layer.cornerRadius = 25;
+    floatBtn.layer.borderWidth = 1.8;
+    floatBtn.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0].CGColor;
+    
+    // Hafif parlama (glow) efekti
+    floatBtn.layer.shadowColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.8].CGColor;
+    floatBtn.layer.shadowOffset = CGSizeMake(0, 0);
+    floatBtn.layer.shadowRadius = 6.0;
+    floatBtn.layer.shadowOpacity = 0.9;
 
-    // Menü Paneli
+    [floatBtn setTitle:@"VEALİX" forState:UIControlStateNormal];
+    floatBtn.titleLabel.font = [UIFont fontWithName:@"ChalkboardSE-Bold" size:10] ?: [UIFont boldSystemFontOfSize:10];
+    [floatBtn setTitleColor:[UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
+    
+    [floatBtn addTarget:[VealixActions class] action:@selector(toggleMenu:) forControlEvents:UIControlEventTouchUpInside];
+
+    UIPanGestureRecognizer *floatPan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handleFloatPan:)];
+    [floatBtn addGestureRecognizer:floatPan];
+
+    // Ana Menü Paneli
     CGFloat screenW = [UIScreen mainScreen].bounds.size.width;
     CGFloat screenH = [UIScreen mainScreen].bounds.size.height;
-    UIView *panel = [[UIView alloc] initWithFrame:CGRectMake((screenW - 280) / 2, (screenH - 480) / 2, 280, 480)];
-    panel.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.09 alpha:0.97];
+    UIView *panel = [[UIView alloc] initWithFrame:CGRectMake((screenW - 280) / 2, (screenH - 490) / 2, 280, 490)];
+    panel.backgroundColor = [UIColor colorWithRed:0.03 green:0.03 blue:0.05 alpha:0.98];
     panel.layer.cornerRadius = 16;
-    panel.layer.borderWidth = 1.0;
-    panel.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.18].CGColor;
+    panel.layer.borderWidth = 1.2;
+    panel.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.5].CGColor;
+    panel.layer.shadowColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.4].CGColor;
+    panel.layer.shadowOffset = CGSizeMake(0, 0);
+    panel.layer.shadowRadius = 10.0;
+    panel.layer.shadowOpacity = 0.8;
     panel.hidden = YES;
 
     UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handlePanelPan:)];
     [panel addGestureRecognizer:panelPan];
 
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 140, 25)];
-    title.text = @"VeaLixHack v2.0";
-    title.font = [UIFont boldSystemFontOfSize:14];
-    title.textColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
+    // Görseldeki Stil Başlık (VEALİX HACK)
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 200, 24)];
+    title.text = @"VEALİX HACK";
+    title.font = [UIFont boldSystemFontOfSize:16];
+    title.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
     [panel addSubview:title];
 
+    // TikTok Alt İmza (VEALİXBL)
+    UILabel *subTitle = [[UILabel alloc] initWithFrame:CGRectMake(15, 33, 200, 16)];
+    subTitle.text = @"TİKTOK: VEALİXBL";
+    subTitle.font = [UIFont systemFontOfSize:10 weight:UIFontWeightBold];
+    subTitle.textColor = [UIColor colorWithRed:0.25 green:0.60 blue:0.95 alpha:0.8];
+    [panel addSubview:subTitle];
+
+    // Kapatma Çarpı Butonu
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    closeBtn.frame = CGRectMake(240, 10, 30, 30);
+    closeBtn.frame = CGRectMake(238, 12, 30, 30);
     [closeBtn setTitle:@"✕" forState:UIControlStateNormal];
     closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
     [closeBtn setTitleColor:[UIColor colorWithRed:1.0 green:0.33 blue:0.33 alpha:1.0] forState:UIControlStateNormal];
-    [closeBtn addTarget:[VealixActions class] action:@selector(closeMenu:) forControlEvents:UIControlEventTouchUpInside];
+    [closeBtn addTarget:[VealixActions class] action:@selector(toggleMenu:) forControlEvents:UIControlEventTouchUpInside];
     [panel addSubview:closeBtn];
 
-    CGFloat startY = 48;
+    // Ayraç Çizgi
+    UIView *lineView = [[UIView alloc] initWithFrame:CGRectMake(15, 58, 250, 1)];
+    lineView.backgroundColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.2];
+    [panel addSubview:lineView];
+
+    CGFloat startY = 68;
 
     // --- ESP ---
     UIView *rowESP = [[UIView alloc] initWithFrame:CGRectMake(12, startY, 256, 42)];
-    rowESP.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    rowESP.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.02];
     rowESP.layer.cornerRadius = 8;
     rowESP.layer.borderWidth = 1.0;
-    rowESP.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.05].CGColor;
+    rowESP.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.15].CGColor;
     UILabel *lblESP = [[UILabel alloc] initWithFrame:CGRectMake(12, 11, 150, 20)];
     lblESP.text = @"ESP";
     lblESP.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     lblESP.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
     [rowESP addSubview:lblESP];
     UISwitch *swESP = [[UISwitch alloc] initWithFrame:CGRectMake(195, 6, 50, 30)];
-    [swESP setOnTintColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0]];
+    [swESP setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
     [rowESP addSubview:swESP];
     [panel addSubview:rowESP];
 
     // --- Kill Aura ---
     UIView *rowKA = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 50, 256, 80)];
-    rowKA.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    rowKA.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.02];
     rowKA.layer.cornerRadius = 8;
     rowKA.layer.borderWidth = 1.0;
-    rowKA.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.05].CGColor;
+    rowKA.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.15].CGColor;
     
     UILabel *lblKA = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, 100, 20)];
     lblKA.text = @"Kill Aura";
@@ -162,7 +216,7 @@ static void BuildVeaLixInterface() {
     [rowKA addSubview:lblKA];
     
     UISwitch *swKA = [[UISwitch alloc] initWithFrame:CGRectMake(195, 4, 50, 30)];
-    [swKA setOnTintColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0]];
+    [swKA setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
     [rowKA addSubview:swKA];
 
     UILabel *lblKAMsg = [[UILabel alloc] initWithFrame:CGRectMake(12, 34, 100, 15)];
@@ -174,7 +228,7 @@ static void BuildVeaLixInterface() {
     killauraValLbl = [[UILabel alloc] initWithFrame:CGRectMake(195, 34, 50, 15)];
     killauraValLbl.text = @"20m";
     killauraValLbl.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
-    killauraValLbl.textColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
+    killauraValLbl.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
     killauraValLbl.textAlignment = NSTextAlignmentRight;
     [rowKA addSubview:killauraValLbl];
 
@@ -182,17 +236,17 @@ static void BuildVeaLixInterface() {
     sliderKA.minimumValue = 1;
     sliderKA.maximumValue = 50;
     sliderKA.value = 20;
-    sliderKA.minimumTrackTintColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
+    sliderKA.minimumTrackTintColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0];
     [sliderKA addTarget:[VealixActions class] action:@selector(sliderChangedKillAura:) forControlEvents:UIControlEventValueChanged];
     [rowKA addSubview:sliderKA];
     [panel addSubview:rowKA];
 
     // --- Aimbot ---
     UIView *rowAim = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 138, 256, 80)];
-    rowAim.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    rowAim.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.02];
     rowAim.layer.cornerRadius = 8;
     rowAim.layer.borderWidth = 1.0;
-    rowAim.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.05].CGColor;
+    rowAim.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.15].CGColor;
     
     UILabel *lblAim = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, 100, 20)];
     lblAim.text = @"Aimbot";
@@ -201,7 +255,7 @@ static void BuildVeaLixInterface() {
     [rowAim addSubview:lblAim];
     
     UISwitch *swAim = [[UISwitch alloc] initWithFrame:CGRectMake(195, 4, 50, 30)];
-    [swAim setOnTintColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0]];
+    [swAim setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
     [rowAim addSubview:swAim];
 
     UILabel *lblAimMsg = [[UILabel alloc] initWithFrame:CGRectMake(12, 34, 100, 15)];
@@ -213,7 +267,7 @@ static void BuildVeaLixInterface() {
     aimbotValLbl = [[UILabel alloc] initWithFrame:CGRectMake(195, 34, 50, 15)];
     aimbotValLbl.text = @"20m";
     aimbotValLbl.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
-    aimbotValLbl.textColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
+    aimbotValLbl.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
     aimbotValLbl.textAlignment = NSTextAlignmentRight;
     [rowAim addSubview:aimbotValLbl];
 
@@ -221,44 +275,47 @@ static void BuildVeaLixInterface() {
     sliderAim.minimumValue = 1;
     sliderAim.maximumValue = 50;
     sliderAim.value = 20;
-    sliderAim.minimumTrackTintColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
+    sliderAim.minimumTrackTintColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0];
     [sliderAim addTarget:[VealixActions class] action:@selector(sliderChangedAimbot:) forControlEvents:UIControlEventValueChanged];
     [rowAim addSubview:sliderAim];
     [panel addSubview:rowAim];
 
     // --- Attack Macro ---
     UIView *rowAM = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 226, 256, 42)];
-    rowAM.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    rowAM.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.02];
     rowAM.layer.cornerRadius = 8;
     rowAM.layer.borderWidth = 1.0;
-    rowAM.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.05].CGColor;
+    rowAM.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.15].CGColor;
     UILabel *lblAM = [[UILabel alloc] initWithFrame:CGRectMake(12, 11, 150, 20)];
     lblAM.text = @"Attack Macro (50 CPS)";
     lblAM.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     lblAM.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
     [rowAM addSubview:lblAM];
     UISwitch *swAM = [[UISwitch alloc] initWithFrame:CGRectMake(195, 6, 50, 30)];
-    [swAM setOnTintColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0]];
+    [swAM setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
     [rowAM addSubview:swAM];
     [panel addSubview:rowAM];
 
     // --- SpinBot ---
     UIView *rowSB = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 274, 256, 42)];
-    rowSB.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    rowSB.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.02];
     rowSB.layer.cornerRadius = 8;
     rowSB.layer.borderWidth = 1.0;
-    rowSB.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.05].CGColor;
+    rowSB.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.15].CGColor;
     UILabel *lblSB = [[UILabel alloc] initWithFrame:CGRectMake(12, 11, 150, 20)];
     lblSB.text = @"360 SpinBot";
     lblSB.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     lblSB.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
     [rowSB addSubview:lblSB];
     UISwitch *swSB = [[UISwitch alloc] initWithFrame:CGRectMake(195, 6, 50, 30)];
-    [swSB setOnTintColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0]];
+    [swSB setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
     [rowSB addSubview:swSB];
     [panel addSubview:rowSB];
 
+    [vc.view addSubview:floatBtn];
     [vc.view addSubview:panel];
+
+    vealixFloatBtn = floatBtn;
     vealixPanel = panel;
 }
 
