@@ -1,112 +1,39 @@
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
 
-@interface VeaLixWebView : WKWebView
-@end
-
-@implementation VeaLixWebView
-- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    return [super pointInside:point withEvent:event];
-}
-@end
-
-@interface VeaLixWindow : UIWindow
-@end
-
-@implementation VeaLixWindow
-- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    for (UIView *subview in self.subviews) {
-        if ([subview pointInside:[self convertPoint:point toView:subview] withEvent:event]) {
-            return YES;
-        }
-    }
-    return NO;
-}
-@end
-
-@interface VeaLixScriptHandler : NSObject <WKScriptMessageHandler>
-@end
-
-@implementation VeaLixScriptHandler
-- (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
-    if ([message.name isEqualToString:@"vealixNative"]) {
-        NSString *text = message.body;
-        
-        UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
-        if (!keyWindow) return;
-        
-        UILabel *toast = [[UILabel alloc] initWithFrame:CGRectMake(keyWindow.bounds.size.width - 180, keyWindow.bounds.size.height - 80, 160, 36)];
-        toast.backgroundColor = [UIColor colorWithRed:0.0 green:0.95 blue:0.99 alpha:0.9];
-        toast.textColor = [UIColor blackColor];
-        toast.font = [UIFont boldSystemFontOfSize:11];
-        toast.textAlignment = NSTextAlignmentCenter;
-        toast.text = text;
-        toast.layer.cornerRadius = 8;
-        toast.clipsToBounds = YES;
-        toast.alpha = 0.0;
-        
-        [keyWindow addSubview:toast];
-        
-        [UIView animateWithDuration:0.25 animations:^{
-            toast.alpha = 1.0;
-        } completion:^(BOOL finished) {
-            [UIView animateWithDuration:0.25 delay:1.2 options:UIViewAnimationOptionCurveEaseOut animations:^{
-                toast.alpha = 0.0;
-            } completion:^(BOOL fin) {
-                [toast removeFromSuperview];
-            }];
-        }];
-    }
-}
-@end
-
-static VeaLixWindow *vealixWindow = nil;
 static WKWebView *vealixWebView = nil;
-static VeaLixScriptHandler *scriptHandler = nil;
 
 static void SetupVeaLixUI() {
-    if (vealixWindow) return;
+    if (vealixWebView) return;
 
-    CGRect screenBounds = [UIScreen mainScreen].bounds;
-
+    UIWindow *keyWindow = nil;
     if (@available(iOS 13.0, *)) {
-        UIWindowScene *targetScene = nil;
         for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
             if (scene.activationState == UISceneActivationStateForegroundActive) {
-                targetScene = scene;
-                break;
+                for (UIWindow *win in scene.windows) {
+                    if (win.isKeyWindow) {
+                        keyWindow = win;
+                        break;
+                    }
+                }
             }
         }
-        if (targetScene) {
-            vealixWindow = [[VeaLixWindow alloc] initWithWindowScene:targetScene];
-        } else {
-            vealixWindow = [[VeaLixWindow alloc] initWithFrame:screenBounds];
-        }
-    } else {
-        vealixWindow = [[VeaLixWindow alloc] initWithFrame:screenBounds];
     }
+    if (!keyWindow) {
+        keyWindow = [UIApplication sharedApplication].keyWindow;
+    }
+    if (!keyWindow || !keyWindow.rootViewController) return;
 
-    vealixWindow.frame = screenBounds;
-    vealixWindow.windowLevel = UIWindowLevelAlert + 9999;
-    vealixWindow.hidden = NO;
-    vealixWindow.backgroundColor = [UIColor clearColor];
-
-    UIViewController *rootVC = [[UIViewController alloc] init];
-    rootVC.view.backgroundColor = [UIColor clearColor];
-    vealixWindow.rootViewController = rootVC;
+    UIViewController *rootVC = keyWindow.rootViewController;
+    CGRect screenBounds = rootVC.view.bounds;
 
     WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
     config.allowsInlineMediaPlayback = YES;
-    
-    scriptHandler = [[VeaLixScriptHandler alloc] init];
-    [config.userContentController addScriptMessageHandler:scriptHandler name:@"vealixNative"];
 
-    vealixWebView = [[VeaLixWebView alloc] initWithFrame:screenBounds configuration:config];
+    vealixWebView = [[WKWebView alloc] initWithFrame:screenBounds configuration:config];
     vealixWebView.backgroundColor = [UIColor clearColor];
     vealixWebView.opaque = NO;
     vealixWebView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    vealixWebView.userInteractionEnabled = YES;
-    vealixWebView.scrollView.userInteractionEnabled = YES;
     vealixWebView.scrollView.scrollEnabled = NO;
 
     NSString *htmlContent = @""
@@ -117,14 +44,14 @@ static void SetupVeaLixUI() {
     "<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>"
     "<style>"
     "* { box-sizing: border-box; user-select: none; -webkit-user-select: none; }"
-    "body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; width: 100vw; height: 100vh; }"
+    "body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; width: 100vw; height: 100vh; pointer-events: none; }"
     
-    "#vealix-toggle-btn { position: absolute; top: 60px; left: 40px; width: 65px; height: 65px; background: rgba(10, 10, 15, 0.95); border: 2px solid #00f2fe; border-radius: 50%; box-shadow: 0 0 15px rgba(0, 242, 254, 0.7); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; z-index: 10000; touch-action: none; }"
+    "#vealix-toggle-btn { position: absolute; top: 60px; left: 40px; width: 65px; height: 65px; background: rgba(10, 10, 15, 0.95); border: 2px solid #00f2fe; border-radius: 50%; box-shadow: 0 0 15px rgba(0, 242, 254, 0.7); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; z-index: 10000; touch-action: none; pointer-events: auto; }"
     "#vealix-toggle-btn:active { transform: scale(0.92); }"
     ".btn-text-main { font-size: 8px; font-weight: 900; color: #00f2fe; text-shadow: 0 0 6px rgba(0,242,254,0.8); letter-spacing: 0.5px; }"
     ".btn-text-sub { font-size: 5px; font-weight: 700; color: #94a3b8; margin-top: 2px; text-align: center; }"
 
-    "#vealix-menu { position: absolute; top: 140px; left: 40px; width: 280px; background: rgba(15, 15, 20, 0.96); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 242, 254, 0.2); z-index: 9999; color: #fff; overflow: hidden; display: none; }"
+    "#vealix-menu { position: absolute; top: 140px; left: 40px; width: 280px; background: rgba(15, 15, 20, 0.96); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 242, 254, 0.2); z-index: 9999; color: #fff; overflow: hidden; display: none; pointer-events: auto; }"
     "#vealix-menu.show { display: block; }"
     
     ".menu-header { padding: 12px 16px; background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2)); border-bottom: 1px solid rgba(255, 255, 255, 0.08); cursor: grab; display: flex; justify-content: space-between; align-items: center; touch-action: none; }"
@@ -210,8 +137,7 @@ static void SetupVeaLixUI() {
     
     "function notifyFeature(checkbox, name) {"
     "  const status = checkbox.checked ? 'Açıldı!' : 'Kapandı!';"
-    "  const msg = name + ' ' + status;"
-    "  window.webkit.messageHandlers.vealixNative.postMessage(msg);"
+    "  console.log(name + ' ' + status);"
     "}"
     
     "let isDraggingBtn = false, btnStartX, btnStartY;"
@@ -234,7 +160,6 @@ static void SetupVeaLixUI() {
 
     [vealixWebView loadHTMLString:htmlContent baseURL:nil];
     [rootVC.view addSubview:vealixWebView];
-    [vealixWindow makeKeyAndVisible];
 }
 
 %ctor {
@@ -242,7 +167,7 @@ static void SetupVeaLixUI() {
                                                       object:nil
                                                        queue:[NSOperationQueue mainQueue]
                                                   usingBlock:^(NSNotification *note) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             SetupVeaLixUI();
         });
     }];
