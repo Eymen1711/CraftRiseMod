@@ -105,6 +105,8 @@ static void SetupVeaLixUI() {
     vealixWebView.backgroundColor = [UIColor clearColor];
     vealixWebView.opaque = NO;
     vealixWebView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    vealixWebView.userInteractionEnabled = YES;
+    vealixWebView.scrollView.userInteractionEnabled = YES;
     vealixWebView.scrollView.scrollEnabled = NO;
 
     NSString *htmlContent = @""
@@ -115,10 +117,8 @@ static void SetupVeaLixUI() {
     "<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>"
     "<style>"
     "* { box-sizing: border-box; user-select: none; -webkit-user-select: none; }"
-    "body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; width: 100vw; height: 100vh; pointer-events: none; }"
+    "body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; width: 100vw; height: 100vh; }"
     
-    "#vealix-toggle-btn, #vealix-menu { pointer-events: auto; }"
-
     "#vealix-toggle-btn { position: absolute; top: 60px; left: 40px; width: 65px; height: 65px; background: rgba(10, 10, 15, 0.95); border: 2px solid #00f2fe; border-radius: 50%; box-shadow: 0 0 15px rgba(0, 242, 254, 0.7); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; z-index: 10000; touch-action: none; }"
     "#vealix-toggle-btn:active { transform: scale(0.92); }"
     ".btn-text-main { font-size: 8px; font-weight: 900; color: #00f2fe; text-shadow: 0 0 6px rgba(0,242,254,0.8); letter-spacing: 0.5px; }"
