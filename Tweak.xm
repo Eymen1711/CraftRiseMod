@@ -25,8 +25,10 @@ static UILabel *aimbotValLbl = nil;
 
 // Slider değerleri değiştiğinde çalışacak metotlar
 @interface VealixActions : NSObject
-+bouncer;
++ (void)sliderChangedKillAura:(UISlider *)sender;
++ (void)sliderChangedAimbot:(UISlider *)sender;
 @end
+
 @implementation VealixActions
 + (void)sliderChangedKillAura:(UISlider *)sender {
     if (killauraValLbl) {
