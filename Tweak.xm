@@ -146,7 +146,6 @@ static void SetupVeaLixUI() {
     "</body>"
     "</html>";
 
-    [vealixWebView loadHTMLName:nil baseURL:nil]; // or loadHTMLString
     [vealixWebView loadHTMLString:htmlContent baseURL:nil];
     [rootVC.view addSubview:vealixWebView];
 }
