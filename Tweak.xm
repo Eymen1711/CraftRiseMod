@@ -115,29 +115,6 @@ static float aimbotDistance = 20.0f;
 }
 @end
 
-// Blok Legends / Oyun İçi Oyuncu Döngüsü Hook Örneği
-// Not: Oyunun kendi player update metoduna göre buradaki sınıf/metod adını güncelleyebilirsin.
-%datainit {
-    // Gerekirse statik başlatmalar buraya
-}
-
-// Örnek Oyuncu Mantık Hook'u (Player Tick / Update simülasyonu)
-// Oyundaki ana karakter sınıfı yakalandığında bu döngü tetiklenir ve hileler çalışır.
-/*
-%hook PlayerController
-- (void)update {
-    %orig;
-    
-    if (isKillAuraEnabled) {
-        // Otomatik vuruş mantığı buraya tetiklenir
-    }
-    if (isSpinBotEnabled) {
-        // Kamera/Açı döndürme mantığı
-    }
-}
-%end
-*/
-
 static void BuildVeaLixInterface() {
     if (vealixWindow) return;
 
