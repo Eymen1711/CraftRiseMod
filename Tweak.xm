@@ -1,6 +1,6 @@
 #import <UIKit/UIKit.h>
 
-static UIWindow *vealixSharedWindow = nil;
+static UIWindow *vealixWindow = nil;
 static UIButton *vealixMenuBtn = nil;
 static UIView *vealixPanel = nil;
 static BOOL isMenuOpen = NO;
@@ -8,34 +8,21 @@ static BOOL isMenuOpen = NO;
 static UILabel *killauraValLbl = nil;
 static UILabel *aimbotValLbl = nil;
 
-// Dokunmaları kesinlikle yutmayan ve sürüklemeyi (Pan) destekleyen buton
-@interface VealixDraggableButton : UIButton
+// Dokunmaları ve sürüklemeyi doğrudan yöneten özel pencere sınıfı
+@interface VealixTouchWindow : UIWindow
 @end
 
-@implementation VealixDraggableButton
-- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [super touchesBegan:touches withEvent:event];
-    [self.superview bringSubviewToFront:self]; // Her zaman en öne al
-}
-
-- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [super touchesEnded:touches withEvent:event];
-    // Eğer sürüklenmediyse sadece tıklama olarak algıla ve menüyü aç/kapat
-    UITouch *touch = [touches anyObject];
-    CGPoint point = [touch locationInView:self];
-    if (point.x >= 0 && point.x <= self.bounds.size.width && point.y >= 0 && point.y <= self.bounds.size.height) {
-        isMenuOpen = !isMenuOpen;
-        if (vealixPanel) {
-            vealixPanel.hidden = !isMenuOpen;
-        }
-    }
+@implementation VealixTouchWindow
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
+    return YES; // Pencere içindeki her dokunmayı kesinlikle yakala
 }
 @end
 
 @interface VealixActions : NSObject
 + (void)sliderChangedKillAura:(UISlider *)sender;
 + (void)sliderChangedAimbot:(UISlider *)sender;
-+ (void)handlePanGesture:(UIPanGestureRecognizer *)gesture;
++ (void)toggleMenu:(UIButton *)sender;
++ (void)handlePan:(UIPanGestureRecognizer *)gesture;
 @end
 
 @implementation VealixActions
@@ -49,13 +36,17 @@ static UILabel *aimbotValLbl = nil;
         aimbotValLbl.text = [NSString stringWithFormat:@"%.0fm", sender.value];
     }
 }
-+ (void)handlePanGesture:(UIPanGestureRecognizer *)gesture {
++ (void)toggleMenu:(UIButton *)sender {
+    isMenuOpen = !isMenuOpen;
+    if (vealixPanel) {
+        vealixPanel.hidden = !isMenuOpen;
+    }
+}
++ (void)handlePan:(UIPanGestureRecognizer *)gesture {
     UIView *btn = gesture.view;
     CGPoint translation = [gesture translationInView:btn.superview];
-    
     CGPoint newCenter = CGPointMake(btn.center.x + translation.x, btn.center.y + translation.y);
     
-    // Ekran dışına çıkmasını engelle
     CGFloat halfW = btn.bounds.size.width / 2;
     CGFloat halfH = btn.bounds.size.height / 2;
     CGSize screenSz = btn.superview.bounds.size;
@@ -66,7 +57,6 @@ static UILabel *aimbotValLbl = nil;
     btn.center = newCenter;
     [gesture setTranslation:CGPointZero inView:btn.superview];
     
-    // Buton sürüklenirken menüyü de butonun altına konumlandırabiliriz veya sabit tutabiliriz
     if (vealixPanel) {
         vealixPanel.frame = CGRectMake(btn.frame.origin.x, btn.frame.origin.y + 75, 280, 480);
     }
@@ -74,37 +64,32 @@ static UILabel *aimbotValLbl = nil;
 @end
 
 static void BuildVeaLixInterface() {
-    if (vealixSharedWindow) return;
+    if (vealixWindow) return;
 
-    UIWindow *targetWindow = nil;
+    // Oyundan tamamen bağımsız, en üst katmanda özel pencere oluşturuyoruz
     if (@available(iOS 13.0, *)) {
         for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
             if (scene.activationState == UISceneActivationStateForegroundActive) {
-                for (UIWindow *win in scene.windows) {
-                    if (win.isKeyWindow) {
-                        targetWindow = win;
-                        break;
-                    }
-                }
+                vealixWindow = [[VealixTouchWindow alloc] initWithWindowScene:scene];
+                break;
             }
         }
     }
-    if (!targetWindow) {
-        targetWindow = [UIApplication sharedApplication].keyWindow;
+    if (!vealixWindow) {
+        vealixWindow = [[VealixTouchWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
     }
-    if (!targetWindow || !targetWindow.rootViewController) return;
 
-    UIViewController *rootVC = targetWindow.rootViewController;
+    vealixWindow.windowLevel = UIWindowLevelAlert + 99999;
+    vealixWindow.backgroundColor = [UIColor clearColor];
+    vealixWindow.hidden = NO;
 
-    // Oyunun pencerelerini bypass eden bağımsız görünüm katmanı
-    UIView *containerView = [[UIView alloc] initWithFrame:rootVC.view.bounds];
-    containerView.backgroundColor = [UIColor clearColor];
-    containerView.userInteractionEnabled = YES;
-    [rootVC.view addSubview:containerView];
-    [rootVC.view bringSubviewToFront:containerView];
+    UIViewController *vc = [[UIViewController alloc] init];
+    vc.view.backgroundColor = [UIColor clearColor];
+    vc.view.userInteractionEnabled = YES;
+    vealixWindow.rootViewController = vc;
 
-    // 1. Sürüklenebilir ve Tıklanabilir Ana Buton
-    VealixDraggableButton *btn = [VealixDraggableButton buttonWithType:UIButtonTypeCustom];
+    // 1. Ana Buton
+    UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
     btn.frame = CGRectMake(35, 55, 65, 65);
     btn.backgroundColor = [UIColor colorWithRed:0.04 green:0.04 blue:0.06 alpha:0.95];
     btn.layer.cornerRadius = 32.5;
@@ -122,9 +107,10 @@ static void BuildVeaLixInterface() {
     btn.titleLabel.textAlignment = NSTextAlignmentCenter;
     [btn setTitleColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
 
-    // Butona Sürükleme (Pan) Özelliği Ekleme
-    UIPanGestureRecognizer *panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handlePanGesture:)];
-    [btn addGestureRecognizer:panGesture];
+    [btn addTarget:[VealixActions class] action:@selector(toggleMenu:) forControlEvents:UIControlEventTouchUpInside];
+
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handlePan:)];
+    [btn addGestureRecognizer:pan];
 
     // 2. Menü Paneli
     UIView *panel = [[UIView alloc] initWithFrame:CGRectMake(35, 135, 280, 480)];
@@ -134,14 +120,12 @@ static void BuildVeaLixInterface() {
     panel.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.18].CGColor;
     panel.hidden = YES;
 
-    // Başlık
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 170, 25)];
     title.text = @"VeaLixHack v2.0";
     title.font = [UIFont boldSystemFontOfSize:14];
     title.textColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
     [panel addSubview:title];
 
-    // TikTok Rozeti
     UILabel *badge = [[UILabel alloc] initWithFrame:CGRectMake(190, 12, 75, 22)];
     badge.text = @"vealixbl";
     badge.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
@@ -170,7 +154,7 @@ static void BuildVeaLixInterface() {
     [rowESP addSubview:swESP];
     [panel addSubview:rowESP];
 
-    // --- Kill Aura (+ Slider) ---
+    // --- Kill Aura ---
     UIView *rowKA = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 50, 256, 80)];
     rowKA.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
     rowKA.layer.cornerRadius = 8;
@@ -209,7 +193,7 @@ static void BuildVeaLixInterface() {
     [rowKA addSubview:sliderKA];
     [panel addSubview:rowKA];
 
-    // --- Aimbot (+ Slider) ---
+    // --- Aimbot ---
     UIView *rowAim = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 138, 256, 80)];
     rowAim.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
     rowAim.layer.cornerRadius = 8;
@@ -280,8 +264,8 @@ static void BuildVeaLixInterface() {
     [rowSB addSubview:swSB];
     [panel addSubview:rowSB];
 
-    [containerView addSubview:btn];
-    [containerView addSubview:panel];
+    [vc.view addSubview:btn];
+    [vc.view addSubview:panel];
 
     vealixMenuBtn = btn;
     vealixPanel = panel;
