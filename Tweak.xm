@@ -8,20 +8,24 @@ static BOOL isMenuOpen = NO;
 static UILabel *killauraValLbl = nil;
 static UILabel *aimbotValLbl = nil;
 
-// Dokunmaları sadece UI elemanlarının üzerindeyken yakalayan, boşluklarda oyuna geçiren akıllı pencere
 @interface VealixTouchWindow : UIWindow
 @end
 
 @implementation VealixTouchWindow
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    // Eğer buton veya menü paneli dokunulan sınırların içindeyse dokunmayı biz alalım
-    if (vealixMenuBtn && [vealixMenuBtn pointInside:[vealixMenuBtn convertPoint:point fromWindow:self] withEvent:event]) {
-        return YES;
+    // Koordinatları penceremizden buton ve panele doğru güvenli bir şekilde çeviriyoruz
+    if (vealixMenuBtn) {
+        CGPoint btnPoint = [self convertPoint:point toView:vealixMenuBtn];
+        if ([vealixMenuBtn pointInside:btnPoint withEvent:event]) {
+            return YES;
+        }
     }
-    if (isMenuOpen && vealixPanel && [vealixPanel pointInside:[vealixPanel convertPoint:point fromWindow:self] withEvent:event]) {
-        return YES;
+    if (isMenuOpen && vealixPanel) {
+        CGPoint panelPoint = [self convertPoint:point toView:vealixPanel];
+        if ([vealixPanel pointInside:panelPoint withEvent:event]) {
+            return YES;
+        }
     }
-    // Değilse dokunmayı arkadaki oyuna aynen salalım (oyun oynanabilsin)
     return NO;
 }
 @end
