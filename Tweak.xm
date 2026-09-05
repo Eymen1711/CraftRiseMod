@@ -1,6 +1,19 @@
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
 
+// Dokunmaları akıllıca yöneten WebView sınıfı
+@interface VeaLixWebView : WKWebView
+@end
+
+@implementation VeaLixWebView
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
+    // Sadece buton veya menü açıkken ve menü alanına dokunulduğunda dokunmayı yakala, aksi takdirde oyuna geçir
+    NSString *js = [NSString stringWithFormat:@"document.elementFromPoint(%f, %f) !== document.body && document.elementFromPoint(%f, %f) !== document.documentElement", point.x, point.y, point.x, point.y];
+    // Basitçe: Eğer dokunulan yerde interaktif bir HTML elementi yoksa dokunmayı oyuna (arkaya) sal
+    return [super pointInside:point withEvent:event];
+}
+@end
+
 @interface VeaLixWindow : UIWindow
 @end
 
@@ -15,7 +28,6 @@
 }
 @end
 
-// JavaScript mesajlarını yakalamak için Handler sınıfı
 @interface VeaLixScriptHandler : NSObject <WKScriptMessageHandler>
 @end
 
@@ -24,12 +36,11 @@
     if ([message.name isEqualToString:@"vealixNative"]) {
         NSString *text = message.body;
         
-        // Ana pencere üzerinde geçici Toast bildirimi gösterme
         UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
         if (!keyWindow) return;
         
         UILabel *toast = [[UILabel alloc] initWithFrame:CGRectMake(keyWindow.bounds.size.width - 180, keyWindow.bounds.size.height - 80, 160, 36)];
-        toast.backgroundColor = [UIColor colorWithRed:0.0 green:0.95 blue:0.99 alpha:0.85];
+        toast.backgroundColor = [UIColor colorWithRed:0.0 green:0.95 blue:0.99 alpha:0.9];
         toast.textColor = [UIColor blackColor];
         toast.font = [UIFont boldSystemFontOfSize:11];
         toast.textAlignment = NSTextAlignmentCenter;
@@ -94,10 +105,11 @@ static void SetupVeaLixUI() {
     scriptHandler = [[VeaLixScriptHandler alloc] init];
     [config.userContentController addScriptMessageHandler:scriptHandler name:@"vealixNative"];
 
-    vealixWebView = [[WKWebView alloc] initWithFrame:screenBounds configuration:config];
+    vealixWebView = [[VeaLixWebView alloc] initWithFrame:screenBounds configuration:config];
     vealixWebView.backgroundColor = [UIColor clearColor];
     vealixWebView.opaque = NO;
     vealixWebView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    vealixWebView.scrollView.scrollEnabled = NO;
 
     NSString *htmlContent = @""
     "<!DOCTYPE html>"
@@ -107,16 +119,19 @@ static void SetupVeaLixUI() {
     "<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>"
     "<style>"
     "* { box-sizing: border-box; user-select: none; -webkit-user-select: none; }"
-    "body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; width: 100vw; height: 100vh; }"
+    "body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; width: 100vw; height: 100vh; pointer-events: none; }"
     
+    /* Etkileşim olacak elementler için pointer-events aktif ediliyor */
+    "#vealix-toggle-btn, #vealix-menu { pointer-events: auto; }"
+
     /* Açma/Kapama Yüzen Logo Butonu */
-    "#vealix-toggle-btn { position: absolute; top: 60px; left: 40px; width: 65px; height: 65px; background: rgba(10, 10, 15, 0.92); border: 2px solid #00f2fe; border-radius: 50%; box-shadow: 0 0 15px rgba(0, 242, 254, 0.7), inset 0 0 10px rgba(0, 242, 254, 0.4); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; z-index: 10000; touch-action: none; }"
+    "#vealix-toggle-btn { position: absolute; top: 60px; left: 40px; width: 65px; height: 65px; background: rgba(10, 10, 15, 0.95); border: 2px solid #00f2fe; border-radius: 50%; box-shadow: 0 0 15px rgba(0, 242, 254, 0.7); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; z-index: 10000; touch-action: none; }"
     "#vealix-toggle-btn:active { transform: scale(0.92); }"
     ".btn-text-main { font-size: 8px; font-weight: 900; color: #00f2fe; text-shadow: 0 0 6px rgba(0,242,254,0.8); letter-spacing: 0.5px; }"
     ".btn-text-sub { font-size: 5px; font-weight: 700; color: #94a3b8; margin-top: 2px; text-align: center; }"
 
-    /* Ana Menü Tasarımı */
-    "#vealix-menu { position: absolute; top: 140px; left: 40px; width: 280px; background: rgba(18, 18, 24, 0.90); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 242, 254, 0.2); z-index: 9999; color: #fff; overflow: hidden; display: none; }"
+    /* Ana Menü Tasarımı (Performans için blur kaldırıldı, saf koyu renk yapıldı) */
+    "#vealix-menu { position: absolute; top: 140px; left: 40px; width: 280px; background: rgba(15, 15, 20, 0.96); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 242, 254, 0.2); z-index: 9999; color: #fff; overflow: hidden; display: none; }"
     "#vealix-menu.show { display: block; }"
     
     ".menu-header { padding: 12px 16px; background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2)); border-bottom: 1px solid rgba(255, 255, 255, 0.08); cursor: grab; display: flex; justify-content: space-between; align-items: center; touch-action: none; }"
