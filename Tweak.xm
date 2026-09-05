@@ -46,7 +46,7 @@ static void SetupVeaLixUI() {
     "* { box-sizing: border-box; user-select: none; -webkit-user-select: none; }"
     "body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; width: 100vw; height: 100vh; pointer-events: none; }"
     
-    "#vealix-toggle-btn { position: absolute; top: 60px; left: 40px; width: 65px; height: 65px; background: rgba(10, 10, 15, 0.95); border: 2px solid #00f2fe; border-radius: 50%; box-shadow: 0 0 15px rgba(0, 242, 254, 0.7); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; z-index: 10000; touch-action: none; pointer-events: auto; }"
+    "#vealix-toggle-btn { position: absolute; top: 60px; left: 40px; width: 65px; height: 65px; background: rgba(10, 10, 15, 0.95); border: 2px solid #00f2fe; border-radius: 50%; box-shadow: 0 0 15px rgba(0, 242, 254, 0.7); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; z-index: 10000; pointer-events: auto; }"
     "#vealix-toggle-btn:active { transform: scale(0.92); }"
     ".btn-text-main { font-size: 8px; font-weight: 900; color: #00f2fe; text-shadow: 0 0 6px rgba(0,242,254,0.8); letter-spacing: 0.5px; }"
     ".btn-text-sub { font-size: 5px; font-weight: 700; color: #94a3b8; margin-top: 2px; text-align: center; }"
@@ -54,7 +54,7 @@ static void SetupVeaLixUI() {
     "#vealix-menu { position: absolute; top: 140px; left: 40px; width: 280px; background: rgba(15, 15, 20, 0.96); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 242, 254, 0.2); z-index: 9999; color: #fff; overflow: hidden; display: none; pointer-events: auto; }"
     "#vealix-menu.show { display: block; }"
     
-    ".menu-header { padding: 12px 16px; background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2)); border-bottom: 1px solid rgba(255, 255, 255, 0.08); cursor: grab; display: flex; justify-content: space-between; align-items: center; touch-action: none; }"
+    ".menu-header { padding: 12px 16px; background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2)); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; }"
     ".menu-title { font-size: 13px; font-weight: 700; letter-spacing: 0.5px; background: linear-gradient(45deg, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }"
     ".tiktok-badge { font-size: 9px; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }"
     ".menu-body { padding: 12px; max-height: 380px; overflow-y: auto; }"
@@ -76,7 +76,7 @@ static void SetupVeaLixUI() {
     "</head>"
     "<body>"
     
-    "<div id='vealix-toggle-btn' ontouchstart='toggleMenu()'>"
+    "<div id='vealix-toggle-btn' onclick='toggleMenu()'>"
     "<span class='btn-text-main'>VEALIX</span>"
     "<span class='btn-text-sub'>HACK</span>"
     "</div>"
@@ -128,8 +128,6 @@ static void SetupVeaLixUI() {
     
     "<script>"
     "const menu = document.getElementById('vealix-menu');"
-    "const toggleBtn = document.getElementById('vealix-toggle-btn');"
-    "const header = document.getElementById('menu-header');"
     
     "function toggleMenu() {"
     "  menu.classList.toggle('show');"
@@ -140,16 +138,6 @@ static void SetupVeaLixUI() {
     "  console.log(name + ' ' + status);"
     "}"
     
-    "let isDraggingBtn = false, btnStartX, btnStartY;"
-    "toggleBtn.addEventListener('touchstart', e => { isDraggingBtn = true; btnStartX = e.touches[0].clientX - toggleBtn.offsetLeft; btnStartY = e.touches[0].clientY - toggleBtn.offsetTop; }, {passive: true});"
-    "document.addEventListener('touchmove', e => { if (!isDraggingBtn) return; toggleBtn.style.left = (e.touches[0].clientX - btnStartX) + 'px'; toggleBtn.style.top = (e.touches[0].clientY - btnStartY) + 'px'; }, {passive: true});"
-    "document.addEventListener('touchend', () => { isDraggingBtn = false; });"
-    
-    "let isDraggingMenu = false, menuStartX, menuStartY;"
-    "header.addEventListener('touchstart', e => { isDraggingMenu = true; menuStartX = e.touches[0].clientX - menu.offsetLeft; menuStartY = e.touches[0].clientY - menu.offsetTop; }, {passive: true});"
-    "document.addEventListener('touchmove', e => { if (!isDraggingMenu) return; menu.style.left = (e.touches[0].clientX - menuStartX) + 'px'; menu.style.top = (e.touches[0].clientY - menuStartY) + 'px'; }, {passive: true});"
-    "document.addEventListener('touchend', () => { isDraggingMenu = false; });"
-    
     "function toggleRange(id, show) {"
     "  const el = document.getElementById(id);"
     "  if (show) { el.classList.add('active'); } else { el.classList.remove('active'); }"
@@ -158,6 +146,7 @@ static void SetupVeaLixUI() {
     "</body>"
     "</html>";
 
+    [vealixWebView loadHTMLName:nil baseURL:nil]; // or loadHTMLString
     [vealixWebView loadHTMLString:htmlContent baseURL:nil];
     [rootVC.view addSubview:vealixWebView];
 }
