@@ -65,10 +65,7 @@ static UILabel *aimbotValLbl = nil;
     btn.center = newCenter;
     [gesture setTranslation:CGPointZero inView:btn.superview];
 }
-+ (void)handlePanelPan:(UIPanGestureRecognizer -> *)gesture {
-    // compatibility fix for signature
-}
-+ (void)handlePanelPanGesture:(UIPanGestureRecognizer *)gesture {
++ (void)handlePanelPan:(UIPanGestureRecognizer *)gesture {
     UIView *panel = gesture.view;
     CGPoint translation = [gesture translationInView:panel.superview];
     CGPoint newCenter = CGPointMake(panel.center.x + translation.x, panel.center.y + translation.y);
@@ -82,13 +79,6 @@ static UILabel *aimbotValLbl = nil;
     
     panel.center = newCenter;
     [gesture setTranslation:CGPointZero inView:panel.superview];
-}
-@end
-
-// Düzenlenen pan panelli method yönlendirmesi
-@implementation VealixActions (PanFix)
-+ (void)handlePanelPan:(UIPanGestureRecognizer *)gesture {
-    [self handlePanelPanGesture:gesture];
 }
 @end
 
@@ -116,7 +106,7 @@ static void BuildVeaLixInterface() {
     vc.view.userInteractionEnabled = YES;
     vealixWindow.rootViewController = vc;
 
-    // Yüzen Menü Tuşu (Görseldeki Neon Mavi Tarzda)
+    // Yüzen Menü Tuşu (Neon Mavi Stil)
     UIButton *floatBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     floatBtn.frame = CGRectMake(30, 80, 50, 50);
     floatBtn.backgroundColor = [UIColor colorWithRed:0.01 green:0.01 blue:0.02 alpha:0.92];
@@ -124,14 +114,13 @@ static void BuildVeaLixInterface() {
     floatBtn.layer.borderWidth = 1.8;
     floatBtn.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0].CGColor;
     
-    // Hafif parlama (glow) efekti
     floatBtn.layer.shadowColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.8].CGColor;
     floatBtn.layer.shadowOffset = CGSizeMake(0, 0);
     floatBtn.layer.shadowRadius = 6.0;
     floatBtn.layer.shadowOpacity = 0.9;
 
     [floatBtn setTitle:@"VEALİX" forState:UIControlStateNormal];
-    floatBtn.titleLabel.font = [UIFont fontWithName:@"ChalkboardSE-Bold" size:10] ?: [UIFont boldSystemFontOfSize:10];
+    floatBtn.titleLabel.font = [UIFont boldSystemFontOfSize:10];
     [floatBtn setTitleColor:[UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
     
     [floatBtn addTarget:[VealixActions class] action:@selector(toggleMenu:) forControlEvents:UIControlEventTouchUpInside];
@@ -156,7 +145,7 @@ static void BuildVeaLixInterface() {
     UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handlePanelPan:)];
     [panel addGestureRecognizer:panelPan];
 
-    // Görseldeki Stil Başlık (VEALİX HACK)
+    // Başlık (VEALİX HACK)
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 200, 24)];
     title.text = @"VEALİX HACK";
     title.font = [UIFont boldSystemFontOfSize:16];
