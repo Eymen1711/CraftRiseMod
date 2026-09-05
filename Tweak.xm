@@ -5,28 +5,37 @@ static UIButton *vealixMenuBtn = nil;
 static UIView *vealixPanel = nil;
 static BOOL isMenuOpen = NO;
 
-// Değer göstergeleri için etiket referansları
 static UILabel *killauraValLbl = nil;
 static UILabel *aimbotValLbl = nil;
 
-// Oyunun dokunmaları yutmasını engelleyen güvenli buton sınıfı
-@interface VealixButton : UIButton
+// Dokunmaları kesinlikle yutmayan ve sürüklemeyi (Pan) destekleyen buton
+@interface VealixDraggableButton : UIButton
 @end
 
-@implementation VealixButton
+@implementation VealixDraggableButton
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [super touchesBegan:touches withEvent:event];
+    [self.superview bringSubviewToFront:self]; // Her zaman en öne al
+}
+
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     [super touchesEnded:touches withEvent:event];
-    isMenuOpen = !isMenuOpen;
-    if (vealixPanel) {
-        vealixPanel.hidden = !isMenuOpen;
+    // Eğer sürüklenmediyse sadece tıklama olarak algıla ve menüyü aç/kapat
+    UITouch *touch = [touches anyObject];
+    CGPoint point = [touch locationInView:self];
+    if (point.x >= 0 && point.x <= self.bounds.size.width && point.y >= 0 && point.y <= self.bounds.size.height) {
+        isMenuOpen = !isMenuOpen;
+        if (vealixPanel) {
+            vealixPanel.hidden = !isMenuOpen;
+        }
     }
 }
 @end
 
-// Slider değerleri değiştiğinde çalışacak metotlar
 @interface VealixActions : NSObject
 + (void)sliderChangedKillAura:(UISlider *)sender;
 + (void)sliderChangedAimbot:(UISlider *)sender;
++ (void)handlePanGesture:(UIPanGestureRecognizer *)gesture;
 @end
 
 @implementation VealixActions
@@ -38,6 +47,28 @@ static UILabel *aimbotValLbl = nil;
 + (void)sliderChangedAimbot:(UISlider *)sender {
     if (aimbotValLbl) {
         aimbotValLbl.text = [NSString stringWithFormat:@"%.0fm", sender.value];
+    }
+}
++ (void)handlePanGesture:(UIPanGestureRecognizer *)gesture {
+    UIView *btn = gesture.view;
+    CGPoint translation = [gesture translationInView:btn.superview];
+    
+    CGPoint newCenter = CGPointMake(btn.center.x + translation.x, btn.center.y + translation.y);
+    
+    // Ekran dışına çıkmasını engelle
+    CGFloat halfW = btn.bounds.size.width / 2;
+    CGFloat halfH = btn.bounds.size.height / 2;
+    CGSize screenSz = btn.superview.bounds.size;
+    
+    newCenter.x = MAX(halfW, MIN(screenSz.width - halfW, newCenter.x));
+    newCenter.y = MAX(halfH, MIN(screenSz.height - halfH, newCenter.y));
+    
+    btn.center = newCenter;
+    [gesture setTranslation:CGPointZero inView:btn.superview];
+    
+    // Buton sürüklenirken menüyü de butonun altına konumlandırabiliriz veya sabit tutabiliriz
+    if (vealixPanel) {
+        vealixPanel.frame = CGRectMake(btn.frame.origin.x, btn.frame.origin.y + 75, 280, 480);
     }
 }
 @end
@@ -65,15 +96,15 @@ static void BuildVeaLixInterface() {
 
     UIViewController *rootVC = targetWindow.rootViewController;
 
-    // Şeffaf Container Katmanı
+    // Oyunun pencerelerini bypass eden bağımsız görünüm katmanı
     UIView *containerView = [[UIView alloc] initWithFrame:rootVC.view.bounds];
     containerView.backgroundColor = [UIColor clearColor];
     containerView.userInteractionEnabled = YES;
     [rootVC.view addSubview:containerView];
     [rootVC.view bringSubviewToFront:containerView];
 
-    // 1. Ana Toggle Butonu (Sol Üst)
-    VealixButton *btn = [VealixButton buttonWithType:UIButtonTypeCustom];
+    // 1. Sürüklenebilir ve Tıklanabilir Ana Buton
+    VealixDraggableButton *btn = [VealixDraggableButton buttonWithType:UIButtonTypeCustom];
     btn.frame = CGRectMake(35, 55, 65, 65);
     btn.backgroundColor = [UIColor colorWithRed:0.04 green:0.04 blue:0.06 alpha:0.95];
     btn.layer.cornerRadius = 32.5;
@@ -91,13 +122,17 @@ static void BuildVeaLixInterface() {
     btn.titleLabel.textAlignment = NSTextAlignmentCenter;
     [btn setTitleColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
 
-    // 2. Tam Donanımlı Menü Paneli (Slider'lar dahil genişletilmiş boyut)
+    // Butona Sürükleme (Pan) Özelliği Ekleme
+    UIPanGestureRecognizer *panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handlePanGesture:)];
+    [btn addGestureRecognizer:panGesture];
+
+    // 2. Menü Paneli
     UIView *panel = [[UIView alloc] initWithFrame:CGRectMake(35, 135, 280, 480)];
     panel.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.09 alpha:0.97];
     panel.layer.cornerRadius = 16;
     panel.layer.borderWidth = 1.0;
     panel.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.18].CGColor;
-    panel.hidden = YES; // Başlangıçta gizli
+    panel.hidden = YES;
 
     // Başlık
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 170, 25)];
@@ -119,7 +154,7 @@ static void BuildVeaLixInterface() {
 
     CGFloat startY = 48;
 
-    // --- 1. ESP ---
+    // --- ESP ---
     UIView *rowESP = [[UIView alloc] initWithFrame:CGRectMake(12, startY, 256, 42)];
     rowESP.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
     rowESP.layer.cornerRadius = 8;
@@ -135,7 +170,7 @@ static void BuildVeaLixInterface() {
     [rowESP addSubview:swESP];
     [panel addSubview:rowESP];
 
-    // --- 2. Kill Aura (+ Slider) ---
+    // --- Kill Aura (+ Slider) ---
     UIView *rowKA = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 50, 256, 80)];
     rowKA.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
     rowKA.layer.cornerRadius = 8;
@@ -174,7 +209,7 @@ static void BuildVeaLixInterface() {
     [rowKA addSubview:sliderKA];
     [panel addSubview:rowKA];
 
-    // --- 3. Aimbot (+ Slider) ---
+    // --- Aimbot (+ Slider) ---
     UIView *rowAim = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 138, 256, 80)];
     rowAim.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
     rowAim.layer.cornerRadius = 8;
@@ -213,7 +248,7 @@ static void BuildVeaLixInterface() {
     [rowAim addSubview:sliderAim];
     [panel addSubview:rowAim];
 
-    // --- 4. Attack Macro ---
+    // --- Attack Macro ---
     UIView *rowAM = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 226, 256, 42)];
     rowAM.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
     rowAM.layer.cornerRadius = 8;
@@ -229,7 +264,7 @@ static void BuildVeaLixInterface() {
     [rowAM addSubview:swAM];
     [panel addSubview:rowAM];
 
-    // --- 5. SpinBot ---
+    // --- SpinBot ---
     UIView *rowSB = [[UIView alloc] initWithFrame:CGRectMake(12, startY + 274, 256, 42)];
     rowSB.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
     rowSB.layer.cornerRadius = 8;
