@@ -8,6 +8,16 @@ static BOOL isMenuOpen = NO;
 static UILabel *killauraValLbl = nil;
 static UILabel *aimbotValLbl = nil;
 
+// Özellik durum ve değer değişkenleri
+static BOOL isESPEnabled = NO;
+static BOOL isKillAuraEnabled = NO;
+static BOOL isAimbotEnabled = NO;
+static BOOL isAttackMacroEnabled = NO;
+static BOOL isSpinBotEnabled = NO;
+
+static float killAuraDistance = 20.0f;
+static float aimbotDistance = 20.0f;
+
 @interface VealixTouchWindow : UIWindow
 @end
 
@@ -26,6 +36,11 @@ static UILabel *aimbotValLbl = nil;
 @end
 
 @interface VealixActions : NSObject
++ (void)switchChangedESP:(UISwitch *)sender;
++ (void)switchChangedKillAura:(UISwitch *)sender;
++ (void)switchChangedAimbot:(UISwitch *)sender;
++ (void)switchChangedMacro:(UISwitch *)sender;
++ (void)switchChangedSpinBot:(UISwitch *)sender;
 + (void)sliderChangedKillAura:(UISlider *)sender;
 + (void)sliderChangedAimbot:(UISlider *)sender;
 + (void)toggleMenu:(UIButton *)sender;
@@ -34,12 +49,29 @@ static UILabel *aimbotValLbl = nil;
 @end
 
 @implementation VealixActions
++ (void)switchChangedESP:(UISwitch *)sender {
+    isESPEnabled = sender.isOn;
+}
++ (void)switchChangedKillAura:(UISwitch *)sender {
+    isKillAuraEnabled = sender.isOn;
+}
++ (void)switchChangedAimbot:(UISwitch *)sender {
+    isAimbotEnabled = sender.isOn;
+}
++ (void)switchChangedMacro:(UISwitch *)sender {
+    isAttackMacroEnabled = sender.isOn;
+}
++ (void)switchChangedSpinBot:(UISwitch *)sender {
+    isSpinBotEnabled = sender.isOn;
+}
 + (void)sliderChangedKillAura:(UISlider *)sender {
+    killAuraDistance = sender.value;
     if (killauraValLbl) {
         killauraValLbl.text = [NSString stringWithFormat:@"%.0fm", sender.value];
     }
 }
 + (void)sliderChangedAimbot:(UISlider *)sender {
+    aimbotDistance = sender.value;
     if (aimbotValLbl) {
         aimbotValLbl.text = [NSString stringWithFormat:@"%.0fm", sender.value];
     }
@@ -187,7 +219,9 @@ static void BuildVeaLixInterface() {
     lblESP.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
     [rowESP addSubview:lblESP];
     UISwitch *swESP = [[UISwitch alloc] initWithFrame:CGRectMake(195, 6, 50, 30)];
+    [swESP setOn:isESPEnabled];
     [swESP setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
+    [swESP addTarget:[VealixActions class] action:@selector(switchChangedESP:) forControlEvents:UIControlEventValueChanged];
     [rowESP addSubview:swESP];
     [panel addSubview:rowESP];
 
@@ -205,7 +239,9 @@ static void BuildVeaLixInterface() {
     [rowKA addSubview:lblKA];
     
     UISwitch *swKA = [[UISwitch alloc] initWithFrame:CGRectMake(195, 4, 50, 30)];
+    [swKA setOn:isKillAuraEnabled];
     [swKA setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
+    [swKA addTarget:[VealixActions class] action:@selector(switchChangedKillAura:) forControlEvents:UIControlEventValueChanged];
     [rowKA addSubview:swKA];
 
     UILabel *lblKAMsg = [[UILabel alloc] initWithFrame:CGRectMake(12, 34, 100, 15)];
@@ -215,7 +251,7 @@ static void BuildVeaLixInterface() {
     [rowKA addSubview:lblKAMsg];
 
     killauraValLbl = [[UILabel alloc] initWithFrame:CGRectMake(195, 34, 50, 15)];
-    killauraValLbl.text = @"20m";
+    killauraValLbl.text = [NSString stringWithFormat:@"%.0fm", killAuraDistance];
     killauraValLbl.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
     killauraValLbl.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
     killauraValLbl.textAlignment = NSTextAlignmentRight;
@@ -224,7 +260,7 @@ static void BuildVeaLixInterface() {
     UISlider *sliderKA = [[UISlider alloc] initWithFrame:CGRectMake(12, 52, 232, 20)];
     sliderKA.minimumValue = 1;
     sliderKA.maximumValue = 50;
-    sliderKA.value = 20;
+    sliderKA.value = killAuraDistance;
     sliderKA.minimumTrackTintColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0];
     [sliderKA addTarget:[VealixActions class] action:@selector(sliderChangedKillAura:) forControlEvents:UIControlEventValueChanged];
     [rowKA addSubview:sliderKA];
@@ -244,7 +280,9 @@ static void BuildVeaLixInterface() {
     [rowAim addSubview:lblAim];
     
     UISwitch *swAim = [[UISwitch alloc] initWithFrame:CGRectMake(195, 4, 50, 30)];
+    [swAim setOn:isAimbotEnabled];
     [swAim setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
+    [swAim addTarget:[VealixActions class] action:@selector(switchChangedAimbot:) forControlEvents:UIControlEventValueChanged];
     [rowAim addSubview:swAim];
 
     UILabel *lblAimMsg = [[UILabel alloc] initWithFrame:CGRectMake(12, 34, 100, 15)];
@@ -254,7 +292,7 @@ static void BuildVeaLixInterface() {
     [rowAim addSubview:lblAimMsg];
 
     aimbotValLbl = [[UILabel alloc] initWithFrame:CGRectMake(195, 34, 50, 15)];
-    aimbotValLbl.text = @"20m";
+    aimbotValLbl.text = [NSString stringWithFormat:@"%.0fm", aimbotDistance];
     aimbotValLbl.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
     aimbotValLbl.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
     aimbotValLbl.textAlignment = NSTextAlignmentRight;
@@ -263,7 +301,7 @@ static void BuildVeaLixInterface() {
     UISlider *sliderAim = [[UISlider alloc] initWithFrame:CGRectMake(12, 52, 232, 20)];
     sliderAim.minimumValue = 1;
     sliderAim.maximumValue = 50;
-    sliderAim.value = 20;
+    sliderAim.value = aimbotDistance;
     sliderAim.minimumTrackTintColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0];
     [sliderAim addTarget:[VealixActions class] action:@selector(sliderChangedAimbot:) forControlEvents:UIControlEventValueChanged];
     [rowAim addSubview:sliderAim];
@@ -281,7 +319,9 @@ static void BuildVeaLixInterface() {
     lblAM.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
     [rowAM addSubview:lblAM];
     UISwitch *swAM = [[UISwitch alloc] initWithFrame:CGRectMake(195, 6, 50, 30)];
+    [swAM setOn:isAttackMacroEnabled];
     [swAM setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
+    [swAM addTarget:[VealixActions class] action:@selector(switchChangedMacro:) forControlEvents:UIControlEventValueChanged];
     [rowAM addSubview:swAM];
     [panel addSubview:rowAM];
 
@@ -297,7 +337,9 @@ static void BuildVeaLixInterface() {
     lblSB.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
     [rowSB addSubview:lblSB];
     UISwitch *swSB = [[UISwitch alloc] initWithFrame:CGRectMake(195, 6, 50, 30)];
+    [swSB setOn:isSpinBotEnabled];
     [swSB setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
+    [swSB addTarget:[VealixActions class] action:@selector(switchChangedSpinBot:) forControlEvents:UIControlEventValueChanged];
     [rowSB addSubview:swSB];
     [panel addSubview:rowSB];
 
