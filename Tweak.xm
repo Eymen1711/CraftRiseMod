@@ -13,18 +13,13 @@ static UILabel *aimbotValLbl = nil;
 
 @implementation VealixTouchWindow
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    // Koordinatları penceremizden buton ve panele doğru güvenli bir şekilde çeviriyoruz
     if (vealixMenuBtn) {
-        CGPoint btnPoint = [self convertPoint:point toView:vealixMenuBtn];
-        if ([vealixMenuBtn pointInside:btnPoint withEvent:event]) {
-            return YES;
-        }
+        CGPoint p1 = [self convertPoint:point toView:vealixMenuBtn];
+        if ([vealixMenuBtn pointInside:p1 withEvent:event]) return YES;
     }
     if (isMenuOpen && vealixPanel) {
-        CGPoint panelPoint = [self convertPoint:point toView:vealixPanel];
-        if ([vealixPanel pointInside:panelPoint withEvent:event]) {
-            return YES;
-        }
+        CGPoint p2 = [self convertPoint:point toView:vealixPanel];
+        if ([vealixPanel pointInside:p2 withEvent:event]) return YES;
     }
     return NO;
 }
