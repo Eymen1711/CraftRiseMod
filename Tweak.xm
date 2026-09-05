@@ -1,4 +1,5 @@
 #import <UIKit/UIKit.h>
+#import <substrate.h>
 
 static UIWindow *vealixWindow = nil;
 static UIButton *vealixFloatBtn = nil;
@@ -8,14 +9,14 @@ static BOOL isMenuOpen = NO;
 static UILabel *killauraValLbl = nil;
 static UILabel *aimbotValLbl = nil;
 
-// Özellik durum ve değer değişkenleri
+// Hile durum ve değer değişkenleri
 static BOOL isESPEnabled = NO;
 static BOOL isKillAuraEnabled = NO;
 static BOOL isAimbotEnabled = NO;
 static BOOL isAttackMacroEnabled = NO;
 static BOOL isSpinBotEnabled = NO;
 
-static float killAuraDistance = 20.0f;
+static float killAuraDistance = 5.0f;
 static float aimbotDistance = 20.0f;
 
 @interface VealixTouchWindow : UIWindow
@@ -67,7 +68,7 @@ static float aimbotDistance = 20.0f;
 + (void)sliderChangedKillAura:(UISlider *)sender {
     killAuraDistance = sender.value;
     if (killauraValLbl) {
-        killauraValLbl.text = [NSString stringWithFormat:@"%.0fm", sender.value];
+        killauraValLbl.text = [NSString stringWithFormat:@"%.1fm", sender.value];
     }
 }
 + (void)sliderChangedAimbot:(UISlider *)sender {
@@ -113,6 +114,29 @@ static float aimbotDistance = 20.0f;
     [gesture setTranslation:CGPointZero inView:panel.superview];
 }
 @end
+
+// Blok Legends / Oyun İçi Oyuncu Döngüsü Hook Örneği
+// Not: Oyunun kendi player update metoduna göre buradaki sınıf/metod adını güncelleyebilirsin.
+%datainit {
+    // Gerekirse statik başlatmalar buraya
+}
+
+// Örnek Oyuncu Mantık Hook'u (Player Tick / Update simülasyonu)
+// Oyundaki ana karakter sınıfı yakalandığında bu döngü tetiklenir ve hileler çalışır.
+/*
+%hook PlayerController
+- (void)update {
+    %orig;
+    
+    if (isKillAuraEnabled) {
+        // Otomatik vuruş mantığı buraya tetiklenir
+    }
+    if (isSpinBotEnabled) {
+        // Kamera/Açı döndürme mantığı
+    }
+}
+%end
+*/
 
 static void BuildVeaLixInterface() {
     if (vealixWindow) return;
@@ -177,14 +201,14 @@ static void BuildVeaLixInterface() {
     UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handlePanelPan:)];
     [panel addGestureRecognizer:panelPan];
 
-    // Başlık (VEALİX HACK)
+    // Başlık
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 200, 24)];
     title.text = @"VEALİX HACK";
     title.font = [UIFont boldSystemFontOfSize:16];
     title.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
     [panel addSubview:title];
 
-    // TikTok Alt İmza (VEALİXBL)
+    // TikTok Alt İmza
     UILabel *subTitle = [[UILabel alloc] initWithFrame:CGRectMake(15, 33, 200, 16)];
     subTitle.text = @"TİKTOK: VEALİXBL";
     subTitle.font = [UIFont systemFontOfSize:10 weight:UIFontWeightBold];
@@ -251,7 +275,7 @@ static void BuildVeaLixInterface() {
     [rowKA addSubview:lblKAMsg];
 
     killauraValLbl = [[UILabel alloc] initWithFrame:CGRectMake(195, 34, 50, 15)];
-    killauraValLbl.text = [NSString stringWithFormat:@"%.0fm", killAuraDistance];
+    killauraValLbl.text = [NSString stringWithFormat:@"%.1fm", killAuraDistance];
     killauraValLbl.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
     killauraValLbl.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
     killauraValLbl.textAlignment = NSTextAlignmentRight;
@@ -259,7 +283,7 @@ static void BuildVeaLixInterface() {
 
     UISlider *sliderKA = [[UISlider alloc] initWithFrame:CGRectMake(12, 52, 232, 20)];
     sliderKA.minimumValue = 1;
-    sliderKA.maximumValue = 50;
+    sliderKA.maximumValue = 15;
     sliderKA.value = killAuraDistance;
     sliderKA.minimumTrackTintColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0];
     [sliderKA addTarget:[VealixActions class] action:@selector(sliderChangedKillAura:) forControlEvents:UIControlEventValueChanged];
