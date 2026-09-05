@@ -33,6 +33,7 @@ static void SetupVeaLixUI() {
     vealixWebView = [[WKWebView alloc] initWithFrame:screenBounds configuration:config];
     vealixWebView.backgroundColor = [UIColor clearColor];
     vealixWebView.opaque = NO;
+    vealixWebView.userInteractionEnabled = YES; // Dokunmaların engellenmesini kesin olarak önler
     vealixWebView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     vealixWebView.scrollView.scrollEnabled = NO;
 
@@ -46,12 +47,12 @@ static void SetupVeaLixUI() {
     "* { box-sizing: border-box; user-select: none; -webkit-user-select: none; }"
     "body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; width: 100vw; height: 100vh; pointer-events: none; }"
     
-    "#vealix-toggle-btn { position: absolute; top: 60px; left: 40px; width: 65px; height: 65px; background: rgba(10, 10, 15, 0.95); border: 2px solid #00f2fe; border-radius: 50%; box-shadow: 0 0 15px rgba(0, 242, 254, 0.7); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; z-index: 10000; pointer-events: auto; }"
+    "#vealix-toggle-btn { position: absolute; top: 60px; left: 40px; width: 65px; height: 65px; background: rgba(10, 10, 15, 0.95); border: 2px solid #00f2fe; border-radius: 50%; box-shadow: 0 0 15px rgba(0, 242, 254, 0.7); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; z-index: 2147483647; pointer-events: auto; }"
     "#vealix-toggle-btn:active { transform: scale(0.92); }"
     ".btn-text-main { font-size: 8px; font-weight: 900; color: #00f2fe; text-shadow: 0 0 6px rgba(0,242,254,0.8); letter-spacing: 0.5px; }"
     ".btn-text-sub { font-size: 5px; font-weight: 700; color: #94a3b8; margin-top: 2px; text-align: center; }"
 
-    "#vealix-menu { position: absolute; top: 140px; left: 40px; width: 280px; background: rgba(15, 15, 20, 0.96); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 242, 254, 0.2); z-index: 9999; color: #fff; overflow: hidden; display: none; pointer-events: auto; }"
+    "#vealix-menu { position: absolute; top: 140px; left: 40px; width: 280px; background: rgba(15, 15, 20, 0.96); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 242, 254, 0.2); z-index: 2147483646; color: #fff; overflow: hidden; display: none; pointer-events: auto; }"
     "#vealix-menu.show { display: block; }"
     
     ".menu-header { padding: 12px 16px; background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2)); border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; }"
@@ -147,7 +148,10 @@ static void SetupVeaLixUI() {
     "</html>";
 
     [vealixWebView loadHTMLString:htmlContent baseURL:nil];
+    
+    // Oyun pencerelerinin altına gömülmemesi için doğrudan view'ın en üst katmanına (subview olarak) ekliyoruz
     [rootVC.view addSubview:vealixWebView];
+    [rootVC.view bringSubviewToFront:vealixWebView];
 }
 
 %ctor {
