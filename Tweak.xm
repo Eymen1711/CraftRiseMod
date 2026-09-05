@@ -1,7 +1,6 @@
 #import <UIKit/UIKit.h>
 
 static UIWindow *vealixWindow = nil;
-static UIButton *vealixMenuBtn = nil;
 static UIView *vealixPanel = nil;
 static BOOL isMenuOpen = NO;
 
@@ -13,13 +12,11 @@ static UILabel *aimbotValLbl = nil;
 
 @implementation VealixTouchWindow
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    if (vealixMenuBtn) {
-        CGPoint p1 = [self convertPoint:point toView:vealixMenuBtn];
-        if ([vealixMenuBtn pointInside:p1 withEvent:event]) return YES;
-    }
     if (isMenuOpen && vealixPanel) {
-        CGPoint p2 = [self convertPoint:point toView:vealixPanel];
-        if ([vealixPanel pointInside:p2 withEvent:event]) return YES;
+        CGPoint panelPoint = [self convertPoint:point toView:vealixPanel];
+        if ([vealixPanel pointInside:panelPoint withEvent:event]) {
+            return YES;
+        }
     }
     return NO;
 }
@@ -28,8 +25,9 @@ static UILabel *aimbotValLbl = nil;
 @interface VealixActions : NSObject
 + (void)sliderChangedKillAura:(UISlider *)sender;
 + (void)sliderChangedAimbot:(UISlider *)sender;
-+ (void)toggleMenu:(UIButton *)sender;
-+ (void)handlePan:(UIPanGestureRecognizer *)gesture;
++ (void)closeMenu:(UIButton *)sender;
++ (void)handleThreeFingerTripleTap:(UITapGestureRecognizer *)gesture;
++ (void)handlePanelPan:(UIPanGestureRecognizer *)gesture;
 @end
 
 @implementation VealixActions
@@ -43,30 +41,35 @@ static UILabel *aimbotValLbl = nil;
         aimbotValLbl.text = [NSString stringWithFormat:@"%.0fm", sender.value];
     }
 }
-+ (void)toggleMenu:(UIButton *)sender {
-    isMenuOpen = !isMenuOpen;
++ (void)closeMenu:(UIButton *)sender {
+    isMenuOpen = NO;
     if (vealixPanel) {
-        vealixPanel.hidden = !isMenuOpen;
+        vealixPanel.hidden = YES;
     }
 }
-+ (void)handlePan:(UIPanGestureRecognizer *)gesture {
-    UIView *btn = gesture.view;
-    CGPoint translation = [gesture translationInView:btn.superview];
-    CGPoint newCenter = CGPointMake(btn.center.x + translation.x, btn.center.y + translation.y);
++ (void)handleThreeFingerTripleTap:(UITapGestureRecognizer *)gesture {
+    if (gesture.state == UIGestureRecognizerStateRecognized) {
+        isMenuOpen = !isMenuOpen;
+        if (vealixPanel) {
+            vealixPanel.hidden = !isMenuOpen;
+        }
+    }
+}
++ (void)handlePanelPan:(UIPanGestureRecognizer *)gesture {
+    UIView *panel = gesture.view;
+    CGPoint translation = [gesture translationInView:panel.superview];
+    CGPoint newCenter = CGPointMake(panel.center.x + translation.x, panel.center.y + translation.y);
     
-    CGFloat halfW = btn.bounds.size.width / 2;
-    CGFloat halfH = btn.bounds.size.height / 2;
-    CGSize screenSz = btn.superview.bounds.size;
+    CGFloat halfW = panel.bounds.size.width / 2;
+    CGFloat halfH = panel.bounds.size.height / 2;
+    CGSize screenSz = panel.superview.bounds.size;
     
+    // Ekran dışına tamamen taşmasını engelle
     newCenter.x = MAX(halfW, MIN(screenSz.width - halfW, newCenter.x));
     newCenter.y = MAX(halfH, MIN(screenSz.height - halfH, newCenter.y));
     
-    btn.center = newCenter;
-    [gesture setTranslation:CGPointZero inView:btn.superview];
-    
-    if (vealixPanel) {
-        vealixPanel.frame = CGRectMake(btn.frame.origin.x, btn.frame.origin.y + 75, 280, 480);
-    }
+    panel.center = newCenter;
+    [gesture setTranslation:CGPointZero inView:panel.superview];
 }
 @end
 
@@ -94,53 +97,40 @@ static void BuildVeaLixInterface() {
     vc.view.userInteractionEnabled = YES;
     vealixWindow.rootViewController = vc;
 
-    // 1. Ana Buton
-    UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
-    btn.frame = CGRectMake(35, 55, 65, 65);
-    btn.backgroundColor = [UIColor colorWithRed:0.04 green:0.04 blue:0.06 alpha:0.95];
-    btn.layer.cornerRadius = 32.5;
-    btn.layer.borderWidth = 2.0;
-    btn.layer.borderColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0].CGColor;
-    
-    btn.layer.shadowColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:0.6].CGColor;
-    btn.layer.shadowOffset = CGSizeZero;
-    btn.layer.shadowRadius = 6.0;
-    btn.layer.shadowOpacity = 1.0;
+    // 3 Parmak 3 Kez Dokunma Algılayıcısı
+    UITapGestureRecognizer *tripleTap = [[UITapGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handleThreeFingerTripleTap:)];
+    tripleTap.numberOfTouchesRequired = 3;
+    tripleTap.numberOfTapsRequired = 3;
+    [vc.view addGestureRecognizer:tripleTap];
 
-    [btn setTitle:@"VEALIX\nHACK" forState:UIControlStateNormal];
-    btn.titleLabel.font = [UIFont boldSystemFontOfSize:9];
-    btn.titleLabel.numberOfLines = 2;
-    btn.titleLabel.textAlignment = NSTextAlignmentCenter;
-    [btn setTitleColor:[UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
-
-    [btn addTarget:[VealixActions class] action:@selector(toggleMenu:) forControlEvents:UIControlEventTouchUpInside];
-
-    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handlePan:)];
-    [btn addGestureRecognizer:pan];
-
-    // 2. Menü Paneli
-    UIView *panel = [[UIView alloc] initWithFrame:CGRectMake(35, 135, 280, 480)];
+    // Menü Paneli
+    CGFloat screenW = [UIScreen mainScreen].bounds.size.width;
+    CGFloat screenH = [UIScreen mainScreen].bounds.size.height;
+    UIView *panel = [[UIView alloc] initWithFrame:CGRectMake((screenW - 280) / 2, (screenH - 480) / 2, 280, 480)];
     panel.backgroundColor = [UIColor colorWithRed:0.06 green:0.06 blue:0.09 alpha:0.97];
     panel.layer.cornerRadius = 16;
     panel.layer.borderWidth = 1.0;
     panel.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.18].CGColor;
     panel.hidden = YES;
 
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 170, 25)];
+    // Paneli Sürükleme (Yüzme) Özelliği
+    UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handlePanelPan:)];
+    [panel addGestureRecognizer:panelPan];
+
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 140, 25)];
     title.text = @"VeaLixHack v2.0";
     title.font = [UIFont boldSystemFontOfSize:14];
     title.textColor = [UIColor colorWithRed:0.0 green:0.92 blue:1.0 alpha:1.0];
     [panel addSubview:title];
 
-    UILabel *badge = [[UILabel alloc] initWithFrame:CGRectMake(190, 12, 75, 22)];
-    badge.text = @"vealixbl";
-    badge.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
-    badge.textColor = [UIColor lightGrayColor];
-    badge.textAlignment = NSTextAlignmentCenter;
-    badge.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.06];
-    badge.layer.cornerRadius = 6;
-    badge.layer.masksToBounds = YES;
-    [panel addSubview:badge];
+    // Kapatma Çarpı Butonu
+    UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    closeBtn.frame = CGRectMake(240, 10, 30, 30);
+    [closeBtn setTitle:@"✕" forState:UIControlStateNormal];
+    closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+    [closeBtn setTitleColor:[UIColor colorWithRed:1.0 green:0.33 blue:0.33 alpha:1.0] forState:UIControlStateNormal];
+    [closeBtn addTarget:[VealixActions class] action:@selector(closeMenu:) forControlEvents:UIControlEventTouchUpInside];
+    [panel addSubview:closeBtn];
 
     CGFloat startY = 48;
 
@@ -270,10 +260,7 @@ static void BuildVeaLixInterface() {
     [rowSB addSubview:swSB];
     [panel addSubview:rowSB];
 
-    [vc.view addSubview:btn];
     [vc.view addSubview:panel];
-
-    vealixMenuBtn = btn;
     vealixPanel = panel;
 }
 
