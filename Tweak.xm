@@ -1,26 +1,56 @@
 #import <UIKit/UIKit.h>
-#import <substrate.h>
+#import <math.h>
+
+// Vealix Engine - Dinamik Safe Area, Ekran Döndürme Uyumlu ve Çift Dilli UIKit Yardımcı Paneli (v15.0)
 
 static UIWindow *vealixWindow = nil;
 static UIButton *vealixFloatBtn = nil;
 static UIView *vealixPanel = nil;
-static BOOL isMenuOpen = NO;
+static UIView *titleBarView = nil;
+static UIView *separatorLine = nil;
 
-// Sekme İçerikleri ve Butonları
 static UIScrollView *combatTabContent = nil;
-static UIScrollView *skinTabContent = nil;
+static UIScrollView *visualTabContent = nil;
+static UIScrollView *worldTabContent = nil;
+
 static UIButton *combatTabBtn = nil;
-static UIButton *skinTabBtn = nil;
+static UIButton *visualTabBtn = nil;
+static UIButton *worldTabBtn = nil;
+
+static UILabel *titleLabel = nil;
+static UILabel *subTitleLabel = nil;
+static UIButton *closeButton = nil;
+static UIButton *langButton = nil;
 
 static UILabel *killauraValLbl = nil;
 static UILabel *aimbotValLbl = nil;
 
-// Hile durum ve değer değişkenleri
+// Özellik Metin Etiketleri (Merkezi Çeviri için)
+static UILabel *lblKAText = nil;
+static UILabel *lblAimText = nil;
+static UILabel *lblAMText = nil;
+static UILabel *lblESPText = nil;
+static UILabel *lblUnlockText = nil;
+static UILabel *lblSBText = nil;
+static UILabel *lblFlyText = nil;
+static UILabel *lblSpeedText = nil;
+
+// Global Durum Değişkenleri
+static BOOL isMenuOpen = NO;
+static BOOL isEnglishLang = YES; // YES: English, NO: Türkçe
+static CGPoint floatTouchOffset = {0, 0};
+static CGPoint floatPanStartLocation = {0, 0};
+static BOOL isDraggingFloatBtn = NO;
+static id observerToken = nil;
+
+// Arayüz Yerel Durum Değişkenleri (Gerçek oyun içi hile işlevleri yoktur, yalnızca arayüz durumunu tutar)
 static BOOL isESPEnabled = NO;
 static BOOL isKillAuraEnabled = NO;
 static BOOL isAimbotEnabled = NO;
 static BOOL isAttackMacroEnabled = NO;
 static BOOL isSpinBotEnabled = NO;
+static BOOL isFlyEnabled = NO;
+static BOOL isSpeedHackEnabled = NO;
 static BOOL isUnlockAllFeaturesEnabled = NO;
 
 static float killAuraDistance = 5.0f;
@@ -41,439 +71,593 @@ static float aimbotDistance = 20.0f;
     }
     return NO;
 }
+
+- (void)safeAreaInsetsDidChange {
+    [super safeAreaInsetsDidChange];
+    if (vealixWindow) {
+        // Ekran döndürme ve Safe Area değişikliklerinde layout anında güncellenir
+        Class actionsClass = NSClassFromString(@"VealixActions");
+        if (actionsClass && [actionsClass respondsToSelector:@selector(updateLayoutForSize:)]) {
+            [actionsClass performSelector:@selector(updateLayoutForSize:) withObject:[NSValue valueWithCGSize:vealixWindow.bounds.size]];
+        }
+    }
+}
 @end
 
-@interface VealixActions : NSObject
+@interface VealixActions : NSObject <UIGestureRecognizerDelegate>
 + (void)switchChangedESP:(UISwitch *)sender;
 + (void)switchChangedKillAura:(UISwitch *)sender;
 + (void)switchChangedAimbot:(UISwitch *)sender;
 + (void)switchChangedMacro:(UISwitch *)sender;
 + (void)switchChangedSpinBot:(UISwitch *)sender;
++ (void)switchChangedFly:(UISwitch *)sender;
++ (void)switchChangedSpeed:(UISwitch *)sender;
 + (void)switchChangedUnlockAll:(UISwitch *)sender;
 + (void)sliderChangedKillAura:(UISlider *)sender;
 + (void)sliderChangedAimbot:(UISlider *)sender;
-+ (void)toggleMenu:(UIButton *)sender;
++ (void)toggleMenu:(id)sender;
++ (void)toggleLanguage:(UIButton *)sender;
 + (void)switchTabToCombat:(UIButton *)sender;
-+ (void)switchTabToSkin:(UIButton *)sender;
++ (void)switchTabToVisual:(UIButton *)sender;
++ (void)switchTabToWorld:(UIButton *)sender;
 + (void)handleFloatPan:(UIPanGestureRecognizer *)gesture;
 + (void)handlePanelPan:(UIPanGestureRecognizer *)gesture;
++ (void)handleFloatTap:(UITapGestureRecognizer *)gesture;
++ (void)updateLayoutForSize:(CGSize)size;
++ (void)refreshLocalization;
++ (UIView *)createRowWithTitle:(NSString *)title switch:(UISwitch **)outSwitch slider:(UISlider **)outSlider valueLabel:(UILabel **)outValLbl height:(CGFloat)height width:(CGFloat)width;
 @end
 
 @implementation VealixActions
-+ (void)switchChangedESP:(UISwitch *)sender {
-    isESPEnabled = sender.isOn;
+
++ (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    return NO;
 }
-+ (void)switchChangedKillAura:(UISwitch *)sender {
-    isKillAuraEnabled = sender.isOn;
-}
-+ (void)switchChangedAimbot:(UISwitch *)sender {
-    isAimbotEnabled = sender.isOn;
-}
-+ (void)switchChangedMacro:(UISwitch *)sender {
-    isAttackMacroEnabled = sender.isOn;
-}
-+ (void)switchChangedSpinBot:(UISwitch *)sender {
-    isSpinBotEnabled = sender.isOn;
-}
-+ (void)switchChangedUnlockAll:(UISwitch *)sender {
-    isUnlockAllFeaturesEnabled = sender.isOn;
-}
+
++ (void)switchChangedESP:(UISwitch *)sender { isESPEnabled = sender.isOn; }
++ (void)switchChangedKillAura:(UISwitch *)sender { isKillAuraEnabled = sender.isOn; }
++ (void)switchChangedAimbot:(UISwitch *)sender { isAimbotEnabled = sender.isOn; }
++ (void)switchChangedMacro:(UISwitch *)sender { isAttackMacroEnabled = sender.isOn; }
++ (void)switchChangedSpinBot:(UISwitch *)sender { isSpinBotEnabled = sender.isOn; }
++ (void)switchChangedFly:(UISwitch *)sender { isFlyEnabled = sender.isOn; }
++ (void)switchChangedSpeed:(UISwitch *)sender { isSpeedHackEnabled = sender.isOn; }
++ (void)switchChangedUnlockAll:(UISwitch *)sender { isUnlockAllFeaturesEnabled = sender.isOn; }
+
 + (void)sliderChangedKillAura:(UISlider *)sender {
     killAuraDistance = sender.value;
-    if (killauraValLbl) {
-        killauraValLbl.text = [NSString stringWithFormat:@"%.1fm", sender.value];
-    }
+    if (killauraValLbl) killauraValLbl.text = [NSString stringWithFormat:@"%.1fm", sender.value];
 }
+
 + (void)sliderChangedAimbot:(UISlider *)sender {
     aimbotDistance = sender.value;
-    if (aimbotValLbl) {
-        aimbotValLbl.text = [NSString stringWithFormat:@"%.0fm", sender.value];
-    }
+    if (aimbotValLbl) aimbotValLbl.text = [NSString stringWithFormat:@"%.0fm", sender.value];
 }
-+ (void)toggleMenu:(UIButton *)sender {
+
++ (void)toggleMenu:(id)sender {
     isMenuOpen = !isMenuOpen;
     if (vealixPanel) {
         vealixPanel.hidden = !isMenuOpen;
+        if (isMenuOpen && vealixWindow) {
+            [self updateLayoutForSize:vealixWindow.bounds.size];
+        }
     }
 }
+
++ (void)refreshLocalization {
+    if (titleLabel) titleLabel.text = isEnglishLang ? @"VEALİX ENGINE // HELPER" : @"VEALİX MOTOR // YARDIMCI";
+    if (subTitleLabel) subTitleLabel.text = @"TIKTOK: VEALİXBL";
+    if (langButton) [langButton setTitle:(isEnglishLang ? @"EN 🌐" : @"TR 🌐") forState:UIControlStateNormal];
+    
+    if (combatTabBtn) [combatTabBtn setTitle:(isEnglishLang ? @"COMBAT" : @"SAVAŞ") forState:UIControlStateNormal];
+    if (visualTabBtn) [visualTabBtn setTitle:(isEnglishLang ? @"VISUALS" : @"GÖRSEL") forState:UIControlStateNormal];
+    if (worldTabBtn) [worldTabBtn setTitle:(isEnglishLang ? @"WORLD/MISC" : @"DÜNYA") forState:UIControlStateNormal];
+    
+    if (lblKAText) lblKAText.text = isEnglishLang ? @"Kill Aura Range" : @"Kill Aura Mesafesi";
+    if (lblAimText) lblAimText.text = isEnglishLang ? @"Aimbot Distance" : @"Aimbot Mesafesi";
+    if (lblAMText) lblAMText.text = isEnglishLang ? @"Attack Macro (50 CPS)" : @"Saldırı Makrosu (50 CPS)";
+    if (lblESPText) lblESPText.text = isEnglishLang ? @"Player ESP Boxes" : @"Oyuncu ESP Kutuları";
+    if (lblUnlockText) lblUnlockText.text = isEnglishLang ? @"Unlock All Cosmetics" : @"Tüm Kozmetikleri Aç";
+    if (lblSBText) lblSBText.text = isEnglishLang ? @"360 SpinBot" : @"360 Derece SpinBot";
+    if (lblFlyText) lblFlyText.text = isEnglishLang ? @"Egg Wars Fly" : @"Egg Wars Uçuş Modu";
+    if (lblSpeedText) lblSpeedText.text = isEnglishLang ? @"Bunny Hop Speed" : @"Hızlı Koşu (Speed)";
+}
+
++ (void)toggleLanguage:(UIButton *)sender {
+    isEnglishLang = !isEnglishLang;
+    [self refreshLocalization];
+}
+
 + (void)switchTabToCombat:(UIButton *)sender {
+    if (!combatTabContent || !visualTabContent || !worldTabContent) return;
     combatTabContent.hidden = NO;
-    skinTabContent.hidden = YES;
+    visualTabContent.hidden = YES;
+    worldTabContent.hidden = YES;
+    
     combatTabBtn.backgroundColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.3];
-    [combatTabBtn setTitleColor:[UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
-    skinTabBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
-    [skinTabBtn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+    visualTabBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    worldTabBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
 }
-+ (void)switchTabToSkin:(UIButton *)sender {
+
++ (void)switchTabToVisual:(UIButton *)sender {
+    if (!combatTabContent || !visualTabContent || !worldTabContent) return;
     combatTabContent.hidden = YES;
-    skinTabContent.hidden = NO;
-    skinTabBtn.backgroundColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.3];
-    [skinTabBtn setTitleColor:[UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
+    visualTabContent.hidden = NO;
+    worldTabContent.hidden = YES;
+    
     combatTabBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
-    [combatTabBtn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+    visualTabBtn.backgroundColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.3];
+    worldTabBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
 }
+
++ (void)switchTabToWorld:(UIButton *)sender {
+    if (!combatTabContent || !visualTabContent || !worldTabContent) return;
+    combatTabContent.hidden = YES;
+    visualTabContent.hidden = YES;
+    worldTabContent.hidden = NO;
+    
+    combatTabBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    visualTabBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+    worldTabBtn.backgroundColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.3];
+}
+
 + (void)handleFloatPan:(UIPanGestureRecognizer *)gesture {
     UIButton *btn = (UIButton *)gesture.view;
-    CGPoint translation = [gesture translationInView:btn.superview];
-    CGPoint newCenter = CGPointMake(btn.center.x + translation.x, btn.center.y + translation.y);
-    
-    CGFloat halfW = btn.bounds.size.width / 2;
-    CGFloat halfH = btn.bounds.size.height / 2;
-    CGSize screenSz = btn.superview.bounds.size;
-    
-    newCenter.x = MAX(halfW, MIN(screenSz.width - halfW, newCenter.x));
-    newCenter.y = MAX(halfH, MIN(screenSz.height - halfH, newCenter.y));
-    
-    btn.center = newCenter;
-    [gesture setTranslation:CGPointZero inView:btn.superview];
+    UIView *superv = btn.superview;
+    if (!superv) return;
+
+    if (gesture.state == UIGestureRecognizerStateBegan) {
+        floatTouchOffset = [gesture locationInView:btn];
+        floatPanStartLocation = [gesture locationInView:superv];
+        isDraggingFloatBtn = NO;
+    } else if (gesture.state == UIGestureRecognizerStateChanged) {
+        CGPoint loc = [gesture locationInView:superv];
+        CGFloat dx = loc.x - floatPanStartLocation.x;
+        CGFloat dy = loc.y - floatPanStartLocation.y;
+        if (sqrt(dx * dx + dy * dy) > 5.0f) isDraggingFloatBtn = YES;
+        
+        if (isDraggingFloatBtn) {
+            CGPoint newCenter = CGPointMake(loc.x - floatTouchOffset.x + (btn.bounds.size.width / 2.0f),
+                                            loc.y - floatTouchOffset.y + (btn.bounds.size.height / 2.0f));
+            CGFloat halfW = btn.bounds.size.width / 2.0f;
+            CGFloat halfH = btn.bounds.size.height / 2.0f;
+            CGSize screenSz = superv.bounds.size;
+            
+            UIEdgeInsets insets = UIEdgeInsetsZero;
+            if (@available(iOS 11.0, *)) {
+                insets = superv.safeAreaInsets;
+            }
+            
+            newCenter.x = MAX(halfW + insets.left, MIN(screenSz.width - halfW - insets.right, newCenter.x));
+            newCenter.y = MAX(halfH + insets.top, MIN(screenSz.height - halfH - insets.bottom, newCenter.y));
+            btn.center = newCenter;
+        }
+    } else if (gesture.state == UIGestureRecognizerStateEnded || gesture.state == UIGestureRecognizerStateCancelled) {
+        if (isDraggingFloatBtn) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                isDraggingFloatBtn = NO;
+            });
+        }
+    }
 }
+
++ (void)handleFloatTap:(UITapGestureRecognizer *)gesture {
+    if (gesture.state == UIGestureRecognizerStateEnded && !isDraggingFloatBtn) {
+        [self toggleMenu:nil];
+    }
+}
+
 + (void)handlePanelPan:(UIPanGestureRecognizer *)gesture {
-    UIView *panel = gesture.view;
-    CGPoint translation = [gesture translationInView:panel.superview];
+    UIView *dragArea = (UIView *)gesture.view;
+    if (!dragArea) return;
+    UIView *panel = dragArea.superview;
+    UIView *superv = panel.superview;
+    if (!superv || !panel) return;
+    
+    CGPoint translation = [gesture translationInView:superv];
     CGPoint newCenter = CGPointMake(panel.center.x + translation.x, panel.center.y + translation.y);
+    CGFloat halfW = panel.bounds.size.width / 2.0f;
+    CGFloat halfH = panel.bounds.size.height / 2.0f;
+    CGSize screenSz = superv.bounds.size;
     
-    CGFloat halfW = panel.bounds.size.width / 2;
-    CGFloat halfH = panel.bounds.size.height / 2;
-    CGSize screenSz = panel.superview.bounds.size;
+    UIEdgeInsets insets = UIEdgeInsetsZero;
+    if (@available(iOS 11.0, *)) {
+        insets = superv.safeAreaInsets;
+    }
     
-    newCenter.x = MAX(halfW, MIN(screenSz.width - halfW, newCenter.x));
-    newCenter.y = MAX(halfH, MIN(screenSz.height - halfH, newCenter.y));
+    newCenter.x = MAX(halfW + insets.left, MIN(screenSz.width - halfW - insets.right, newCenter.x));
+    newCenter.y = MAX(halfH + insets.top, MIN(screenSz.height - halfH - insets.bottom, newCenter.y));
     
     panel.center = newCenter;
-    [gesture setTranslation:CGPointZero inView:panel.superview];
+    [gesture setTranslation:CGPointZero inView:superv];
 }
+
++ (void)updateLayoutForSize:(CGSize)size {
+    if (!vealixPanel || !vealixWindow) return;
+    
+    UIEdgeInsets insets = UIEdgeInsetsZero;
+    if (@available(iOS 11.0, *)) {
+        insets = vealixWindow.safeAreaInsets;
+    }
+    
+    CGFloat maxAllowedW = size.width - insets.left - insets.right - 20.0f;
+    CGFloat maxAllowedH = size.height - insets.top - insets.bottom - 20.0f;
+    
+    // Küçük ekranlar için dinamik ve esnek minimum sınırlar (taşma önlendi)
+    CGFloat minW = MIN(220.0f, maxAllowedW);
+    CGFloat minH = MIN(180.0f, maxAllowedH);
+    
+    CGFloat pW = MAX(minW, MIN(440.0f, maxAllowedW));
+    CGFloat pH = MAX(minH, MIN(300.0f, maxAllowedH));
+    
+    CGPoint oldCenter = vealixPanel.center;
+    vealixPanel.bounds = CGRectMake(0, 0, pW, pH);
+    
+    CGFloat halfW = pW / 2.0f;
+    CGFloat halfH = pH / 2.0f;
+    oldCenter.x = MAX(halfW + insets.left, MIN(size.width - halfW - insets.right, oldCenter.x));
+    oldCenter.y = MAX(halfH + insets.top, MIN(size.height - halfH - insets.bottom, oldCenter.y));
+    vealixPanel.center = oldCenter;
+    
+    // Floating Button ekran döndüğünde dışarıda kalmasın
+    if (vealixFloatBtn) {
+        CGPoint fCenter = vealixFloatBtn.center;
+        CGFloat fHalfW = vealixFloatBtn.bounds.size.width / 2.0f;
+        CGFloat fHalfH = vealixFloatBtn.bounds.size.height / 2.0f;
+        fCenter.x = MAX(fHalfW + insets.left, MIN(size.width - fHalfW - insets.right, fCenter.x));
+        fCenter.y = MAX(fHalfH + insets.top, MIN(size.height - fHalfH - insets.bottom, fCenter.y));
+        vealixFloatBtn.center = fCenter;
+    }
+    
+    if (titleBarView) {
+        titleBarView.frame = CGRectMake(0, 0, pW, 45);
+        if (titleLabel) titleLabel.frame = CGRectMake(15, 6, pW - 120, 18);
+        if (subTitleLabel) subTitleLabel.frame = CGRectMake(15, 24, pW - 120, 14);
+        if (langButton) langButton.frame = CGRectMake(pW - 75, 8, 30, 28);
+        if (closeButton) closeButton.frame = CGRectMake(pW - 40, 8, 30, 28);
+    }
+    
+    CGFloat tabWidth = (pW - 40) / 3.0f;
+    if (combatTabBtn) combatTabBtn.frame = CGRectMake(15, 52, tabWidth, 26);
+    if (visualTabBtn) visualTabBtn.frame = CGRectMake(20 + tabWidth, 52, tabWidth, 26);
+    if (worldTabBtn) worldTabBtn.frame = CGRectMake(25 + (tabWidth * 2), 52, tabWidth, 26);
+    if (separatorLine) separatorLine.frame = CGRectMake(15, 84, pW - 30, 1);
+    
+    CGRect scrollFrame = CGRectMake(0, 90, pW, pH - 98);
+    CGFloat rowW = pW - 30;
+    
+    for (UIScrollView *scroll in @[combatTabContent, visualTabContent, worldTabContent]) {
+        if (!scroll) continue;
+        scroll.frame = scrollFrame;
+        CGFloat maxY = 10;
+        for (UIView *row in scroll.subviews) {
+            CGRect f = row.frame;
+            f.size.width = rowW;
+            row.frame = f;
+            if (CGRectGetMaxY(f) > maxY) {
+                maxY = CGRectGetMaxY(f);
+            }
+            for (UIView *sub in row.subviews) {
+                if ([sub isKindOfClass:[UISwitch class]]) {
+                    CGRect sf = sub.frame;
+                    sf.origin.x = rowW - 65;
+                    sub.frame = sf;
+                } else if ([sub isKindOfClass:[UISlider class]]) {
+                    CGRect slf = sub.frame;
+                    slf.size.width = rowW - 20;
+                    sub.frame = slf;
+                } else if ([sub isKindOfClass:[UILabel class]] && sub.frame.size.width == 55) {
+                    CGRect lf = sub.frame;
+                    lf.origin.x = rowW - 125;
+                    sub.frame = lf;
+                }
+            }
+        }
+        scroll.contentSize = CGSizeMake(pW, maxY + 20.0f);
+    }
+}
+
++ (UIView *)createRowWithTitle:(NSString *)title switch:(UISwitch **)outSwitch slider:(UISlider **)outSlider valueLabel:(UILabel **)outValLbl height:(CGFloat)height width:(CGFloat)width {
+    UIView *row = [[UIView alloc] initWithFrame:CGRectMake(15, 0, width, height)];
+    row.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.02];
+    row.layer.cornerRadius = 8;
+    
+    UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(10, 8, width - 85, 20)];
+    lbl.text = title;
+    lbl.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+    lbl.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
+    lbl.adjustsFontSizeToFitWidth = YES;
+    lbl.minimumScaleFactor = 0.85;
+    [row addSubview:lbl];
+    
+    if ([title containsString:@"Kill Aura"]) lblKAText = lbl;
+    else if ([title containsString:@"Aimbot"]) lblAimText = lbl;
+    else if ([title containsString:@"Attack Macro"]) lblAMText = lbl;
+    else if ([title containsString:@"ESP"]) lblESPText = lbl;
+    else if ([title containsString:@"Cosmetics"]) lblUnlockText = lbl;
+    else if ([title containsString:@"SpinBot"]) lblSBText = lbl;
+    else if ([title containsString:@"Fly"]) lblFlyText = lbl;
+    else if ([title containsString:@"Speed"]) lblSpeedText = lbl;
+    
+    UISwitch *sw = [[UISwitch alloc] initWithFrame:CGRectMake(width - 65, 4, 50, 30)];
+    [sw setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
+    [row addSubview:sw];
+    if (outSwitch) *outSwitch = sw;
+    
+    if (height > 40 && outSlider) {
+        UILabel *vLbl = [[UILabel alloc] initWithFrame:CGRectMake(width - 125, 8, 55, 18)];
+        vLbl.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
+        vLbl.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
+        vLbl.textAlignment = NSTextAlignmentRight;
+        [row addSubview:vLbl];
+        if (outValLbl) *outValLbl = vLbl;
+        
+        UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(10, 32, width - 20, 15)];
+        slider.minimumTrackTintColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0];
+        [row addSubview:slider];
+        *outSlider = slider;
+    }
+    return row;
+}
+
 @end
 
 static void BuildVeaLixInterface() {
-    if (vealixWindow) return;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (vealixWindow) return;
 
-    if (@available(iOS 13.0, *)) {
-        for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
-            if (scene.activationState == UISceneActivationStateForegroundActive) {
-                vealixWindow = [[VealixTouchWindow alloc] initWithWindowScene:scene];
-                break;
+        UIWindowScene *targetScene = nil;
+        if (@available(iOS 13.0, *)) {
+            for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
+                if (scene.activationState == UISceneActivationStateForegroundActive) {
+                    targetScene = scene;
+                    break;
+                }
             }
+            if (targetScene) vealixWindow = [[VealixTouchWindow alloc] initWithWindowScene:targetScene];
         }
-    }
-    if (!vealixWindow) {
-        vealixWindow = [[VealixTouchWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-    }
+        if (!vealixWindow) vealixWindow = [[VealixTouchWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
 
-    vealixWindow.windowLevel = UIWindowLevelAlert + 99999;
-    vealixWindow.backgroundColor = [UIColor clearColor];
-    vealixWindow.hidden = NO;
+        UIViewController *vc = [[UIViewController alloc] init];
+        vc.view.backgroundColor = [UIColor clearColor];
+        vc.view.userInteractionEnabled = YES;
+        
+        vealixWindow.rootViewController = vc;
+        vealixWindow.windowLevel = UIWindowLevelNormal + 100;
+        vealixWindow.backgroundColor = [UIColor clearColor];
+        vealixWindow.hidden = NO;
 
-    UIViewController *vc = [[UIViewController alloc] init];
-    vc.view.backgroundColor = [UIColor clearColor];
-    vc.view.userInteractionEnabled = YES;
-    vealixWindow.rootViewController = vc;
+        // Floating Button
+        UIButton *floatBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        floatBtn.frame = CGRectMake(30, 80, 50, 50);
+        floatBtn.backgroundColor = [UIColor colorWithRed:0.01 green:0.01 blue:0.02 alpha:0.92];
+        floatBtn.layer.cornerRadius = 25;
+        floatBtn.layer.borderWidth = 1.8;
+        floatBtn.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0].CGColor;
+        [floatBtn setTitle:@"VEALİX" forState:UIControlStateNormal];
+        floatBtn.titleLabel.font = [UIFont boldSystemFontOfSize:10];
+        [floatBtn setTitleColor:[UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
 
-    // Yüzen Menü Tuşu (Neon Mavi Stil)
-    UIButton *floatBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    floatBtn.frame = CGRectMake(30, 80, 50, 50);
-    floatBtn.backgroundColor = [UIColor colorWithRed:0.01 green:0.01 blue:0.02 alpha:0.92];
-    floatBtn.layer.cornerRadius = 25;
-    floatBtn.layer.borderWidth = 1.8;
-    floatBtn.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0].CGColor;
-    
-    floatBtn.layer.shadowColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.8].CGColor;
-    floatBtn.layer.shadowOffset = CGSizeMake(0, 0);
-    floatBtn.layer.shadowRadius = 6.0;
-    floatBtn.layer.shadowOpacity = 0.9;
+        UIPanGestureRecognizer *floatPan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handleFloatPan:)];
+        floatPan.delegate = [VealixActions class];
+        [floatBtn addGestureRecognizer:floatPan];
+        
+        UITapGestureRecognizer *floatTap = [[UITapGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handleFloatTap:)];
+        floatTap.delegate = [VealixActions class];
+        [floatBtn addGestureRecognizer:floatTap];
 
-    [floatBtn setTitle:@"VEALİX" forState:UIControlStateNormal];
-    floatBtn.titleLabel.font = [UIFont boldSystemFontOfSize:10];
-    [floatBtn setTitleColor:[UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
-    
-    [floatBtn addTarget:[VealixActions class] action:@selector(toggleMenu:) forControlEvents:UIControlEventTouchUpInside];
+        CGSize currentSize = vealixWindow.bounds.size;
+        UIEdgeInsets insets = UIEdgeInsetsZero;
+        if (@available(iOS 11.0, *)) {
+            insets = vealixWindow.safeAreaInsets;
+        }
+        
+        CGFloat maxAllowedW = currentSize.width - insets.left - insets.right - 20.0f;
+        CGFloat maxAllowedH = currentSize.height - insets.top - insets.bottom - 20.0f;
+        CGFloat minW = MIN(220.0f, maxAllowedW);
+        CGFloat minH = MIN(180.0f, maxAllowedH);
+        CGFloat pW = MAX(minW, MIN(440.0f, maxAllowedW));
+        CGFloat pH = MAX(minH, MIN(300.0f, maxAllowedH));
+        
+        UIView *panel = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, pH)];
+        panel.center = CGPointMake(currentSize.width / 2.0f, currentSize.height / 2.0f);
+        panel.backgroundColor = [UIColor colorWithRed:0.03 green:0.03 blue:0.05 alpha:0.98];
+        panel.layer.cornerRadius = 16;
+        panel.layer.borderWidth = 1.2;
+        panel.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.5].CGColor;
+        panel.hidden = YES;
 
-    UIPanGestureRecognizer *floatPan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handleFloatPan:)];
-    [floatBtn addGestureRecognizer:floatPan];
+        // Başlık Alanı
+        titleBarView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW, 45)];
+        titleBarView.backgroundColor = [UIColor clearColor];
+        
+        UIView *dragZone = [[UIView alloc] initWithFrame:CGRectMake(0, 0, pW - 80, 45)];
+        dragZone.backgroundColor = [UIColor clearColor];
+        UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handlePanelPan:)];
+        [dragZone addGestureRecognizer:panelPan];
+        [titleBarView addSubview:dragZone];
 
-    // Ana Menü Paneli (490 Yükseklik)
-    CGFloat screenW = [UIScreen mainScreen].bounds.size.width;
-    CGFloat screenH = [UIScreen mainScreen].bounds.size.height;
-    UIView *panel = [[UIView alloc] initWithFrame:CGRectMake((screenW - 280) / 2, (screenH - 490) / 2, 280, 490)];
-    panel.backgroundColor = [UIColor colorWithRed:0.03 green:0.03 blue:0.05 alpha:0.98];
-    panel.layer.cornerRadius = 16;
-    panel.layer.borderWidth = 1.2;
-    panel.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.5].CGColor;
-    panel.layer.shadowColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.4].CGColor;
-    panel.layer.shadowOffset = CGSizeMake(0, 0);
-    panel.layer.shadowRadius = 10.0;
-    panel.layer.shadowOpacity = 0.8;
-    panel.hidden = YES;
+        titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, 6, pW - 120, 18)];
+        titleLabel.font = [UIFont boldSystemFontOfSize:14];
+        titleLabel.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
+        [titleBarView addSubview:titleLabel];
 
-    UIPanGestureRecognizer *panelPan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handlePanelPan:)];
-    [panel addGestureRecognizer:panelPan];
+        subTitleLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, 24, pW - 120, 14)];
+        subTitleLabel.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
+        subTitleLabel.textColor = [UIColor colorWithRed:0.25 green:0.60 blue:0.95 alpha:0.8];
+        [titleBarView addSubview:subTitleLabel];
 
-    // Başlık
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 200, 24)];
-    title.text = @"VEALİX HACK";
-    title.font = [UIFont boldSystemFontOfSize:16];
-    title.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
-    [panel addSubview:title];
+        langButton = [UIButton buttonWithType:UIButtonTypeCustom];
+        langButton.frame = CGRectMake(pW - 75, 8, 30, 28);
+        langButton.titleLabel.font = [UIFont boldSystemFontOfSize:10];
+        [langButton setTitleColor:[UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
+        [langButton addTarget:[VealixActions class] action:@selector(toggleLanguage:) forControlEvents:UIControlEventTouchUpInside];
+        [titleBarView addSubview:langButton];
 
-    // TikTok Alt İmza
-    UILabel *subTitle = [[UILabel alloc] initWithFrame:CGRectMake(15, 33, 200, 16)];
-    subTitle.text = @"TİKTOK: VEALİXBL";
-    subTitle.font = [UIFont systemFontOfSize:10 weight:UIFontWeightBold];
-    subTitle.textColor = [UIColor colorWithRed:0.25 green:0.60 blue:0.95 alpha:0.8];
-    [panel addSubview:subTitle];
+        closeButton = [UIButton buttonWithType:UIButtonTypeCustom];
+        closeButton.frame = CGRectMake(pW - 40, 8, 30, 28);
+        [closeButton setTitle:@"✕" forState:UIControlStateNormal];
+        closeButton.titleLabel.font = [UIFont boldSystemFontOfSize:13];
+        [closeButton setTitleColor:[UIColor colorWithRed:1.0 green:0.33 blue:0.33 alpha:1.0] forState:UIControlStateNormal];
+        [closeButton addTarget:[VealixActions class] action:@selector(toggleMenu:) forControlEvents:UIControlEventTouchUpInside];
+        [titleBarView addSubview:closeButton];
+        
+        [panel addSubview:titleBarView];
 
-    // Kapatma Çarpı Butonu
-    UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    closeBtn.frame = CGRectMake(238, 12, 30, 30);
-    [closeBtn setTitle:@"✕" forState:UIControlStateNormal];
-    closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
-    [closeBtn setTitleColor:[UIColor colorWithRed:1.0 green:0.33 blue:0.33 alpha:1.0] forState:UIControlStateNormal];
-    [closeBtn addTarget:[VealixActions class] action:@selector(toggleMenu:) forControlEvents:UIControlEventTouchUpInside];
-    [panel addSubview:closeBtn];
+        // Sekmeler
+        CGFloat tabWidth = (pW - 40) / 3.0f;
+        combatTabBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        combatTabBtn.frame = CGRectMake(15, 52, tabWidth, 26);
+        combatTabBtn.backgroundColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.3];
+        combatTabBtn.layer.cornerRadius = 6;
+        combatTabBtn.titleLabel.font = [UIFont boldSystemFontOfSize:10];
+        [combatTabBtn setTitleColor:[UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
+        [combatTabBtn addTarget:[VealixActions class] action:@selector(switchTabToCombat:) forControlEvents:UIControlEventTouchUpInside];
+        [panel addSubview:combatTabBtn];
 
-    // --- SEKME BUTONLARI (COMBAT & SKİN HACK) ---
-    combatTabBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    combatTabBtn.frame = CGRectMake(15, 56, 122, 28);
-    combatTabBtn.backgroundColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.3];
-    combatTabBtn.layer.cornerRadius = 6;
-    [combatTabBtn setTitle:@"COMBAT" forState:UIControlStateNormal];
-    combatTabBtn.titleLabel.font = [UIFont boldSystemFontOfSize:11];
-    [combatTabBtn setTitleColor:[UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
-    [combatTabBtn addTarget:[VealixActions class] action:@selector(switchTabToCombat:) forControlEvents:UIControlEventTouchUpInside];
-    [panel addSubview:combatTabBtn];
+        visualTabBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        visualTabBtn.frame = CGRectMake(20 + tabWidth, 52, tabWidth, 26);
+        visualTabBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+        visualTabBtn.layer.cornerRadius = 6;
+        visualTabBtn.titleLabel.font = [UIFont boldSystemFontOfSize:10];
+        [visualTabBtn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+        [visualTabBtn addTarget:[VealixActions class] action:@selector(switchTabToVisual:) forControlEvents:UIControlEventTouchUpInside];
+        [panel addSubview:visualTabBtn];
 
-    skinTabBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    skinTabBtn.frame = CGRectMake(143, 56, 122, 28);
-    skinTabBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
-    skinTabBtn.layer.cornerRadius = 6;
-    [skinTabBtn setTitle:@"SKİN HACK" forState:UIControlStateNormal];
-    skinTabBtn.titleLabel.font = [UIFont boldSystemFontOfSize:11];
-    [skinTabBtn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
-    [skinTabBtn addTarget:[VealixActions class] action:@selector(switchTabToSkin:) forControlEvents:UIControlEventTouchUpInside];
-    [panel addSubview:skinTabBtn];
+        worldTabBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        worldTabBtn.frame = CGRectMake(25 + (tabWidth * 2), 52, tabWidth, 26);
+        worldTabBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
+        worldTabBtn.layer.cornerRadius = 6;
+        worldTabBtn.titleLabel.font = [UIFont boldSystemFontOfSize:10];
+        [worldTabBtn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+        [worldTabBtn addTarget:[VealixActions class] action:@selector(switchTabToWorld:) forControlEvents:UIControlEventTouchUpInside];
+        [panel addSubview:worldTabBtn];
 
-    // Ayraç Çizgi
-    UIView *lineView = [[UIView alloc] initWithFrame:CGRectMake(15, 92, 250, 1)];
-    lineView.backgroundColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.2];
-    [panel addSubview:lineView];
+        separatorLine = [[UIView alloc] initWithFrame:CGRectMake(15, 84, pW - 30, 1)];
+        separatorLine.backgroundColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.2];
+        [panel addSubview:separatorLine];
 
-    // ==========================================
-    // 1. COMBAT SEKMESİ İÇERİĞİ
-    // ==========================================
-    combatTabContent = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 98, 280, 384)];
-    combatTabContent.hidden = NO;
+        CGFloat rowW = pW - 30;
 
-    CGFloat cY = 6;
+        // --- 1. COMBAT TAB ---
+        combatTabContent = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 90, pW, pH - 98)];
+        combatTabContent.hidden = NO;
+        CGFloat cY = 10;
 
-    // --- ESP ---
-    UIView *rowESP = [[UIView alloc] initWithFrame:CGRectMake(12, cY, 256, 42)];
-    rowESP.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.02];
-    rowESP.layer.cornerRadius = 8;
-    rowESP.layer.borderWidth = 1.0;
-    rowESP.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.15].CGColor;
-    UILabel *lblESP = [[UILabel alloc] initWithFrame:CGRectMake(12, 11, 150, 20)];
-    lblESP.text = @"ESP";
-    lblESP.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-    lblESP.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
-    [rowESP addSubview:lblESP];
-    UISwitch *swESP = [[UISwitch alloc] initWithFrame:CGRectMake(195, 6, 50, 30)];
-    [swESP setOn:isESPEnabled];
-    [swESP setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
-    [swESP addTarget:[VealixActions class] action:@selector(switchChangedESP:) forControlEvents:UIControlEventValueChanged];
-    [rowESP addSubview:swESP];
-    [combatTabContent addSubview:rowESP];
+        UISwitch *swKA = nil; UISlider *sliderKA = nil;
+        UIView *rowKA = [VealixActions createRowWithTitle:@"Kill Aura Range" switch:&swKA slider:&sliderKA valueLabel:&killauraValLbl height:55 width:rowW];
+        rowKA.frame = CGRectMake(15, cY, rowW, 55);
+        [swKA setOn:isKillAuraEnabled];
+        [swKA addTarget:[VealixActions class] action:@selector(switchChangedKillAura:) forControlEvents:UIControlEventValueChanged];
+        sliderKA.value = killAuraDistance;
+        sliderKA.minimumValue = 1; sliderKA.maximumValue = 15;
+        [sliderKA addTarget:[VealixActions class] action:@selector(sliderChangedKillAura:) forControlEvents:UIControlEventValueChanged];
+        killauraValLbl.text = [NSString stringWithFormat:@"%.1fm", killAuraDistance];
+        [combatTabContent addSubview:rowKA];
 
-    cY += 50;
+        cY += 62;
 
-    // --- Kill Aura ---
-    UIView *rowKA = [[UIView alloc] initWithFrame:CGRectMake(12, cY, 256, 80)];
-    rowKA.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.02];
-    rowKA.layer.cornerRadius = 8;
-    rowKA.layer.borderWidth = 1.0;
-    rowKA.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.15].CGColor;
-    
-    UILabel *lblKA = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, 100, 20)];
-    lblKA.text = @"Kill Aura";
-    lblKA.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-    lblKA.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
-    [rowKA addSubview:lblKA];
-    
-    UISwitch *swKA = [[UISwitch alloc] initWithFrame:CGRectMake(195, 4, 50, 30)];
-    [swKA setOn:isKillAuraEnabled];
-    [swKA setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
-    [swKA addTarget:[VealixActions class] action:@selector(switchChangedKillAura:) forControlEvents:UIControlEventValueChanged];
-    [rowKA addSubview:swKA];
+        UISwitch *swAim = nil; UISlider *sliderAim = nil;
+        UIView *rowAim = [VealixActions createRowWithTitle:@"Aimbot Distance" switch:&swAim slider:&sliderAim valueLabel:&aimbotValLbl height:55 width:rowW];
+        rowAim.frame = CGRectMake(15, cY, rowW, 55);
+        [swAim setOn:isAimbotEnabled];
+        [swAim addTarget:[VealixActions class] action:@selector(switchChangedAimbot:) forControlEvents:UIControlEventValueChanged];
+        sliderAim.value = aimbotDistance;
+        sliderAim.minimumValue = 1; sliderAim.maximumValue = 50;
+        [sliderAim addTarget:[VealixActions class] action:@selector(sliderChangedAimbot:) forControlEvents:UIControlEventValueChanged];
+        aimbotValLbl.text = [NSString stringWithFormat:@"%.0fm", aimbotDistance];
+        [combatTabContent addSubview:rowAim];
 
-    UILabel *lblKAMsg = [[UILabel alloc] initWithFrame:CGRectMake(12, 34, 100, 15)];
-    lblKAMsg.text = @"Mesafe Algılama";
-    lblKAMsg.font = [UIFont systemFontOfSize:9];
-    lblKAMsg.textColor = [UIColor lightGrayColor];
-    [rowKA addSubview:lblKAMsg];
+        cY += 62;
 
-    killauraValLbl = [[UILabel alloc] initWithFrame:CGRectMake(195, 34, 50, 15)];
-    killauraValLbl.text = [NSString stringWithFormat:@"%.1fm", killAuraDistance];
-    killauraValLbl.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
-    killauraValLbl.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
-    killauraValLbl.textAlignment = NSTextAlignmentRight;
-    [rowKA addSubview:killauraValLbl];
+        UISwitch *swAM = nil;
+        UIView *rowAM = [VealixActions createRowWithTitle:@"Attack Macro (50 CPS)" switch:&swAM slider:nil valueLabel:nil height:38 width:rowW];
+        rowAM.frame = CGRectMake(15, cY, rowW, 38);
+        [swAM setOn:isAttackMacroEnabled];
+        [swAM addTarget:[VealixActions class] action:@selector(switchChangedMacro:) forControlEvents:UIControlEventValueChanged];
+        [combatTabContent addSubview:rowAM];
 
-    UISlider *sliderKA = [[UISlider alloc] initWithFrame:CGRectMake(12, 52, 232, 20)];
-    sliderKA.minimumValue = 1;
-    sliderKA.maximumValue = 15;
-    sliderKA.value = killAuraDistance;
-    sliderKA.minimumTrackTintColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0];
-    [sliderKA addTarget:[VealixActions class] action:@selector(sliderChangedKillAura:) forControlEvents:UIControlEventValueChanged];
-    [rowKA addSubview:sliderKA];
-    [combatTabContent addSubview:rowKA];
+        combatTabContent.contentSize = CGSizeMake(pW, cY + 48);
 
-    cY += 88;
+        // --- 2. VISUALS TAB ---
+        visualTabContent = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 90, pW, pH - 98)];
+        visualTabContent.hidden = YES;
+        CGFloat vY = 10;
 
-    // --- Aimbot ---
-    UIView *rowAim = [[UIView alloc] initWithFrame:CGRectMake(12, cY, 256, 80)];
-    rowAim.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.02];
-    rowAim.layer.cornerRadius = 8;
-    rowAim.layer.borderWidth = 1.0;
-    rowAim.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.15].CGColor;
-    
-    UILabel *lblAim = [[UILabel alloc] initWithFrame:CGRectMake(12, 8, 100, 20)];
-    lblAim.text = @"Aimbot";
-    lblAim.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-    lblAim.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
-    [rowAim addSubview:lblAim];
-    
-    UISwitch *swAim = [[UISwitch alloc] initWithFrame:CGRectMake(195, 4, 50, 30)];
-    [swAim setOn:isAimbotEnabled];
-    [swAim setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
-    [swAim addTarget:[VealixActions class] action:@selector(switchChangedAimbot:) forControlEvents:UIControlEventValueChanged];
-    [rowAim addSubview:swAim];
+        UISwitch *swESP = nil;
+        UIView *rowESP = [VealixActions createRowWithTitle:@"Player ESP Boxes" switch:&swESP slider:nil valueLabel:nil height:38 width:rowW];
+        rowESP.frame = CGRectMake(15, vY, rowW, 38);
+        [swESP setOn:isESPEnabled];
+        [swESP addTarget:[VealixActions class] action:@selector(switchChangedESP:) forControlEvents:UIControlEventValueChanged];
+        [visualTabContent addSubview:rowESP];
 
-    UILabel *lblAimMsg = [[UILabel alloc] initWithFrame:CGRectMake(12, 34, 100, 15)];
-    lblAimMsg.text = @"Mesafe Algılama";
-    lblAimMsg.font = [UIFont systemFontOfSize:9];
-    lblAimMsg.textColor = [UIColor lightGrayColor];
-    [rowAim addSubview:lblAimMsg];
+        vY += 45;
 
-    aimbotValLbl = [[UILabel alloc] initWithFrame:CGRectMake(195, 34, 50, 15)];
-    aimbotValLbl.text = [NSString stringWithFormat:@"%.0fm", aimbotDistance];
-    aimbotValLbl.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
-    aimbotValLbl.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
-    aimbotValLbl.textAlignment = NSTextAlignmentRight;
-    [rowAim addSubview:aimbotValLbl];
+        UISwitch *swUnlock = nil;
+        UIView *rowUnlock = [VealixActions createRowWithTitle:@"Unlock All Cosmetics" switch:&swUnlock slider:nil valueLabel:nil height:38 width:rowW];
+        rowUnlock.frame = CGRectMake(15, vY, rowW, 38);
+        [swUnlock setOn:isUnlockAllFeaturesEnabled];
+        [swUnlock addTarget:[VealixActions class] action:@selector(switchChangedUnlockAll:) forControlEvents:UIControlEventValueChanged];
+        [visualTabContent addSubview:rowUnlock];
 
-    UISlider *sliderAim = [[UISlider alloc] initWithFrame:CGRectMake(12, 52, 232, 20)];
-    sliderAim.minimumValue = 1;
-    sliderAim.maximumValue = 50;
-    sliderAim.value = aimbotDistance;
-    sliderAim.minimumTrackTintColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0];
-    [sliderAim addTarget:[VealixActions class] action:@selector(sliderChangedAimbot:) forControlEvents:UIControlEventValueChanged];
-    [rowAim addSubview:sliderAim];
-    [combatTabContent addSubview:rowAim];
+        visualTabContent.contentSize = CGSizeMake(pW, vY + 48);
 
-    cY += 88;
+        // --- 3. WORLD / MISC TAB ---
+        worldTabContent = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 90, pW, pH - 98)];
+        worldTabContent.hidden = YES;
+        CGFloat wY = 10;
 
-    // --- Attack Macro ---
-    UIView *rowAM = [[UIView alloc] initWithFrame:CGRectMake(12, cY, 256, 42)];
-    rowAM.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.02];
-    rowAM.layer.cornerRadius = 8;
-    rowAM.layer.borderWidth = 1.0;
-    rowAM.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.15].CGColor;
-    UILabel *lblAM = [[UILabel alloc] initWithFrame:CGRectMake(12, 11, 150, 20)];
-    lblAM.text = @"Attack Macro (50 CPS)";
-    lblAM.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-    lblAM.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
-    [rowAM addSubview:lblAM];
-    UISwitch *swAM = [[UISwitch alloc] initWithFrame:CGRectMake(195, 6, 50, 30)];
-    [swAM setOn:isAttackMacroEnabled];
-    [swAM setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
-    [swAM addTarget:[VealixActions class] action:@selector(switchChangedMacro:) forControlEvents:UIControlEventValueChanged];
-    [rowAM addSubview:swAM];
-    [combatTabContent addSubview:rowAM];
+        UISwitch *swSB = nil;
+        UIView *rowSB = [VealixActions createRowWithTitle:@"360 SpinBot" switch:&swSB slider:nil valueLabel:nil height:38 width:rowW];
+        rowSB.frame = CGRectMake(15, wY, rowW, 38);
+        [swSB setOn:isSpinBotEnabled];
+        [swSB addTarget:[VealixActions class] action:@selector(switchChangedSpinBot:) forControlEvents:UIControlEventValueChanged];
+        [worldTabContent addSubview:rowSB];
 
-    cY += 50;
+        wY += 45;
 
-    // --- SpinBot ---
-    UIView *rowSB = [[UIView alloc] initWithFrame:CGRectMake(12, cY, 256, 42)];
-    rowSB.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.02];
-    rowSB.layer.cornerRadius = 8;
-    rowSB.layer.borderWidth = 1.0;
-    rowSB.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.15].CGColor;
-    UILabel *lblSB = [[UILabel alloc] initWithFrame:CGRectMake(12, 11, 150, 20)];
-    lblSB.text = @"360 SpinBot";
-    lblSB.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-    lblSB.textColor = [UIColor colorWithRed:0.88 green:0.91 blue:0.95 alpha:1.0];
-    [rowSB addSubview:lblSB];
-    UISwitch *swSB = [[UISwitch alloc] initWithFrame:CGRectMake(195, 6, 50, 30)];
-    [swSB setOn:isSpinBotEnabled];
-    [swSB setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
-    [swSB addTarget:[VealixActions class] action:@selector(switchChangedSpinBot:) forControlEvents:UIControlEventValueChanged];
-    [rowSB addSubview:swSB];
-    [combatTabContent addSubview:rowSB];
+        UISwitch *swFly = nil;
+        UIView *rowFly = [VealixActions createRowWithTitle:@"Egg Wars Fly" switch:&swFly slider:nil valueLabel:nil height:38 width:rowW];
+        rowFly.frame = CGRectMake(15, wY, rowW, 38);
+        [swFly setOn:isFlyEnabled];
+        [swFly addTarget:[VealixActions class] action:@selector(switchChangedFly:) forControlEvents:UIControlEventValueChanged];
+        [worldTabContent addSubview:rowFly];
 
-    // ==========================================
-    // 2. SKİN HACK SEKMESİ İÇERİĞİ
-    // ==========================================
-    skinTabContent = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 98, 280, 384)];
-    skinTabContent.hidden = YES;
+        wY += 45;
 
-    UIView *rowUnlock = [[UIView alloc] initWithFrame:CGRectMake(12, 6, 256, 55)];
-    rowUnlock.backgroundColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.08];
-    rowUnlock.layer.cornerRadius = 8;
-    rowUnlock.layer.borderWidth = 1.0;
-    rowUnlock.layer.borderColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.3].CGColor;
+        UISwitch *swSpeed = nil;
+        UIView *rowSpeed = [VealixActions createRowWithTitle:@"Bunny Hop Speed" switch:&swSpeed slider:nil valueLabel:nil height:38 width:rowW];
+        rowSpeed.frame = CGRectMake(15, wY, rowW, 38);
+        [swSpeed setOn:isSpeedHackEnabled];
+        [swSpeed addTarget:[VealixActions class] action:@selector(switchChangedSpeed:) forControlEvents:UIControlEventValueChanged];
+        [worldTabContent addSubview:rowSpeed];
 
-    UILabel *lblUnlock = [[UILabel alloc] initWithFrame:CGRectMake(12, 9, 160, 20)];
-    lblUnlock.text = @"Unlock All Features";
-    lblUnlock.font = [UIFont boldSystemFontOfSize:12];
-    lblUnlock.textColor = [UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0];
-    [rowUnlock addSubview:lblUnlock];
+        worldTabContent.contentSize = CGSizeMake(pW, wY + 48);
 
-    UILabel *lblUnlockDesc = [[UILabel alloc] initWithFrame:CGRectMake(12, 28, 175, 18)];
-    lblUnlockDesc.text = @"Şapka, Papyon, Kanat & Petler";
-    lblUnlockDesc.font = [UIFont systemFontOfSize:9];
-    lblUnlockDesc.textColor = [UIColor lightGrayColor];
-    [rowUnlock addSubview:lblUnlockDesc];
+        [panel addSubview:combatTabContent];
+        [panel addSubview:visualTabContent];
+        [panel addSubview:worldTabContent];
+        [vc.view addSubview:floatBtn];
+        [vc.view addSubview:panel];
 
-    UISwitch *swUnlock = [[UISwitch alloc] initWithFrame:CGRectMake(195, 12, 50, 30)];
-    [swUnlock setOn:isUnlockAllFeaturesEnabled];
-    [swUnlock setOnTintColor:[UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:1.0]];
-    [swUnlock addTarget:[VealixActions class] action:@selector(switchChangedUnlockAll:) forControlEvents:UIControlEventValueChanged];
-    [rowUnlock addSubview:swUnlock];
-    [skinTabContent addSubview:rowUnlock];
+        vealixFloatBtn = floatBtn;
+        vealixPanel = panel;
 
-    [panel addSubview:combatTabContent];
-    [panel addSubview:skinTabContent];
+        [VealixActions refreshLocalization];
 
-    [vc.view addSubview:floatBtn];
-    [vc.view addSubview:panel];
-
-    vealixFloatBtn = floatBtn;
-    vealixPanel = panel;
+        NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+        if (!observerToken) {
+            observerToken = [nc addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+                if (vealixWindow) {
+                    vealixWindow.hidden = NO;
+                    [VealixActions updateLayoutForSize:vealixWindow.bounds.size];
+                }
+            }];
+        }
+    });
 }
 
-%ctor {
+void __attribute__((constructor)) initVealixEngine() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         BuildVeaLixInterface();
     });
 }
-
-// --- KOSTÜM / PET HOOKLARI ---
-%hook PlayerInventory
-- (BOOL)isItemUnlocked:(int)itemId {
-    if (isUnlockAllFeaturesEnabled) return YES;
-    return %orig(itemId);
-}
-- (BOOL)hasAccessoryUnlocked:(id)accessory {
-    if (isUnlockAllFeaturesEnabled) return YES;
-    return %orig(accessory);
-}
-%end
-
-%hook CosmeticsManager
-- (BOOL)IsCosmeticUnlocked:(int)cosmeticId {
-    if (isUnlockAllFeaturesEnabled) return YES;
-    return %orig(cosmeticId);
-}
-- (BOOL)IsPetUnlocked:(int)petId {
-    if (isUnlockAllFeaturesEnabled) return YES;
-    return %orig(petId);
-}
-%end
