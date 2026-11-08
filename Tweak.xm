@@ -1,7 +1,7 @@
 #import <UIKit/UIKit.h>
 #import <math.h>
 
-// Vealix Engine - Dinamik Safe Area, Ekran Döndürme Uyumlu ve Çift Dilli UIKit Yardımcı Paneli (v15.0)
+// Vealix Engine - Safe Area, Ekran Döndürme Uyumlu ve Hatasız Delegate Mimarisi (v15.1)
 
 static UIWindow *vealixWindow = nil;
 static UIButton *vealixFloatBtn = nil;
@@ -75,7 +75,6 @@ static float aimbotDistance = 20.0f;
 - (void)safeAreaInsetsDidChange {
     [super safeAreaInsetsDidChange];
     if (vealixWindow) {
-        // Ekran döndürme ve Safe Area değişikliklerinde layout anında güncellenir
         Class actionsClass = NSClassFromString(@"VealixActions");
         if (actionsClass && [actionsClass respondsToSelector:@selector(updateLayoutForSize:)]) {
             [actionsClass performSelector:@selector(updateLayoutForSize:) withObject:[NSValue valueWithCGSize:vealixWindow.bounds.size]];
@@ -85,6 +84,7 @@ static float aimbotDistance = 20.0f;
 @end
 
 @interface VealixActions : NSObject <UIGestureRecognizerDelegate>
++ (instancetype)sharedInstance;
 + (void)switchChangedESP:(UISwitch *)sender;
 + (void)switchChangedKillAura:(UISwitch *)sender;
 + (void)switchChangedAimbot:(UISwitch *)sender;
@@ -110,7 +110,16 @@ static float aimbotDistance = 20.0f;
 
 @implementation VealixActions
 
-+ (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
++ (instancetype)sharedInstance {
+    static VealixActions *shared = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        shared = [[VealixActions alloc] init];
+    });
+    return shared;
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
     return NO;
 }
 
@@ -282,7 +291,6 @@ static float aimbotDistance = 20.0f;
     CGFloat maxAllowedW = size.width - insets.left - insets.right - 20.0f;
     CGFloat maxAllowedH = size.height - insets.top - insets.bottom - 20.0f;
     
-    // Küçük ekranlar için dinamik ve esnek minimum sınırlar (taşma önlendi)
     CGFloat minW = MIN(220.0f, maxAllowedW);
     CGFloat minH = MIN(180.0f, maxAllowedH);
     
@@ -298,7 +306,6 @@ static float aimbotDistance = 20.0f;
     oldCenter.y = MAX(halfH + insets.top, MIN(size.height - halfH - insets.bottom, oldCenter.y));
     vealixPanel.center = oldCenter;
     
-    // Floating Button ekran döndüğünde dışarıda kalmasın
     if (vealixFloatBtn) {
         CGPoint fCenter = vealixFloatBtn.center;
         CGFloat fHalfW = vealixFloatBtn.bounds.size.width / 2.0f;
@@ -438,11 +445,11 @@ static void BuildVeaLixInterface() {
         [floatBtn setTitleColor:[UIColor colorWithRed:0.35 green:0.78 blue:1.0 alpha:1.0] forState:UIControlStateNormal];
 
         UIPanGestureRecognizer *floatPan = [[UIPanGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handleFloatPan:)];
-        floatPan.delegate = [VealixActions class];
+        floatPan.delegate = [VealixActions sharedInstance];
         [floatBtn addGestureRecognizer:floatPan];
         
         UITapGestureRecognizer *floatTap = [[UITapGestureRecognizer alloc] initWithTarget:[VealixActions class] action:@selector(handleFloatTap:)];
-        floatTap.delegate = [VealixActions class];
+        floatTap.delegate = [VealixActions sharedInstance];
         [floatBtn addGestureRecognizer:floatTap];
 
         CGSize currentSize = vealixWindow.bounds.size;
@@ -525,139 +532,4 @@ static void BuildVeaLixInterface() {
 
         worldTabBtn = [UIButton buttonWithType:UIButtonTypeCustom];
         worldTabBtn.frame = CGRectMake(25 + (tabWidth * 2), 52, tabWidth, 26);
-        worldTabBtn.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.03];
-        worldTabBtn.layer.cornerRadius = 6;
-        worldTabBtn.titleLabel.font = [UIFont boldSystemFontOfSize:10];
-        [worldTabBtn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
-        [worldTabBtn addTarget:[VealixActions class] action:@selector(switchTabToWorld:) forControlEvents:UIControlEventTouchUpInside];
-        [panel addSubview:worldTabBtn];
-
-        separatorLine = [[UIView alloc] initWithFrame:CGRectMake(15, 84, pW - 30, 1)];
-        separatorLine.backgroundColor = [UIColor colorWithRed:0.22 green:0.65 blue:1.0 alpha:0.2];
-        [panel addSubview:separatorLine];
-
-        CGFloat rowW = pW - 30;
-
-        // --- 1. COMBAT TAB ---
-        combatTabContent = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 90, pW, pH - 98)];
-        combatTabContent.hidden = NO;
-        CGFloat cY = 10;
-
-        UISwitch *swKA = nil; UISlider *sliderKA = nil;
-        UIView *rowKA = [VealixActions createRowWithTitle:@"Kill Aura Range" switch:&swKA slider:&sliderKA valueLabel:&killauraValLbl height:55 width:rowW];
-        rowKA.frame = CGRectMake(15, cY, rowW, 55);
-        [swKA setOn:isKillAuraEnabled];
-        [swKA addTarget:[VealixActions class] action:@selector(switchChangedKillAura:) forControlEvents:UIControlEventValueChanged];
-        sliderKA.value = killAuraDistance;
-        sliderKA.minimumValue = 1; sliderKA.maximumValue = 15;
-        [sliderKA addTarget:[VealixActions class] action:@selector(sliderChangedKillAura:) forControlEvents:UIControlEventValueChanged];
-        killauraValLbl.text = [NSString stringWithFormat:@"%.1fm", killAuraDistance];
-        [combatTabContent addSubview:rowKA];
-
-        cY += 62;
-
-        UISwitch *swAim = nil; UISlider *sliderAim = nil;
-        UIView *rowAim = [VealixActions createRowWithTitle:@"Aimbot Distance" switch:&swAim slider:&sliderAim valueLabel:&aimbotValLbl height:55 width:rowW];
-        rowAim.frame = CGRectMake(15, cY, rowW, 55);
-        [swAim setOn:isAimbotEnabled];
-        [swAim addTarget:[VealixActions class] action:@selector(switchChangedAimbot:) forControlEvents:UIControlEventValueChanged];
-        sliderAim.value = aimbotDistance;
-        sliderAim.minimumValue = 1; sliderAim.maximumValue = 50;
-        [sliderAim addTarget:[VealixActions class] action:@selector(sliderChangedAimbot:) forControlEvents:UIControlEventValueChanged];
-        aimbotValLbl.text = [NSString stringWithFormat:@"%.0fm", aimbotDistance];
-        [combatTabContent addSubview:rowAim];
-
-        cY += 62;
-
-        UISwitch *swAM = nil;
-        UIView *rowAM = [VealixActions createRowWithTitle:@"Attack Macro (50 CPS)" switch:&swAM slider:nil valueLabel:nil height:38 width:rowW];
-        rowAM.frame = CGRectMake(15, cY, rowW, 38);
-        [swAM setOn:isAttackMacroEnabled];
-        [swAM addTarget:[VealixActions class] action:@selector(switchChangedMacro:) forControlEvents:UIControlEventValueChanged];
-        [combatTabContent addSubview:rowAM];
-
-        combatTabContent.contentSize = CGSizeMake(pW, cY + 48);
-
-        // --- 2. VISUALS TAB ---
-        visualTabContent = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 90, pW, pH - 98)];
-        visualTabContent.hidden = YES;
-        CGFloat vY = 10;
-
-        UISwitch *swESP = nil;
-        UIView *rowESP = [VealixActions createRowWithTitle:@"Player ESP Boxes" switch:&swESP slider:nil valueLabel:nil height:38 width:rowW];
-        rowESP.frame = CGRectMake(15, vY, rowW, 38);
-        [swESP setOn:isESPEnabled];
-        [swESP addTarget:[VealixActions class] action:@selector(switchChangedESP:) forControlEvents:UIControlEventValueChanged];
-        [visualTabContent addSubview:rowESP];
-
-        vY += 45;
-
-        UISwitch *swUnlock = nil;
-        UIView *rowUnlock = [VealixActions createRowWithTitle:@"Unlock All Cosmetics" switch:&swUnlock slider:nil valueLabel:nil height:38 width:rowW];
-        rowUnlock.frame = CGRectMake(15, vY, rowW, 38);
-        [swUnlock setOn:isUnlockAllFeaturesEnabled];
-        [swUnlock addTarget:[VealixActions class] action:@selector(switchChangedUnlockAll:) forControlEvents:UIControlEventValueChanged];
-        [visualTabContent addSubview:rowUnlock];
-
-        visualTabContent.contentSize = CGSizeMake(pW, vY + 48);
-
-        // --- 3. WORLD / MISC TAB ---
-        worldTabContent = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 90, pW, pH - 98)];
-        worldTabContent.hidden = YES;
-        CGFloat wY = 10;
-
-        UISwitch *swSB = nil;
-        UIView *rowSB = [VealixActions createRowWithTitle:@"360 SpinBot" switch:&swSB slider:nil valueLabel:nil height:38 width:rowW];
-        rowSB.frame = CGRectMake(15, wY, rowW, 38);
-        [swSB setOn:isSpinBotEnabled];
-        [swSB addTarget:[VealixActions class] action:@selector(switchChangedSpinBot:) forControlEvents:UIControlEventValueChanged];
-        [worldTabContent addSubview:rowSB];
-
-        wY += 45;
-
-        UISwitch *swFly = nil;
-        UIView *rowFly = [VealixActions createRowWithTitle:@"Egg Wars Fly" switch:&swFly slider:nil valueLabel:nil height:38 width:rowW];
-        rowFly.frame = CGRectMake(15, wY, rowW, 38);
-        [swFly setOn:isFlyEnabled];
-        [swFly addTarget:[VealixActions class] action:@selector(switchChangedFly:) forControlEvents:UIControlEventValueChanged];
-        [worldTabContent addSubview:rowFly];
-
-        wY += 45;
-
-        UISwitch *swSpeed = nil;
-        UIView *rowSpeed = [VealixActions createRowWithTitle:@"Bunny Hop Speed" switch:&swSpeed slider:nil valueLabel:nil height:38 width:rowW];
-        rowSpeed.frame = CGRectMake(15, wY, rowW, 38);
-        [swSpeed setOn:isSpeedHackEnabled];
-        [swSpeed addTarget:[VealixActions class] action:@selector(switchChangedSpeed:) forControlEvents:UIControlEventValueChanged];
-        [worldTabContent addSubview:rowSpeed];
-
-        worldTabContent.contentSize = CGSizeMake(pW, wY + 48);
-
-        [panel addSubview:combatTabContent];
-        [panel addSubview:visualTabContent];
-        [panel addSubview:worldTabContent];
-        [vc.view addSubview:floatBtn];
-        [vc.view addSubview:panel];
-
-        vealixFloatBtn = floatBtn;
-        vealixPanel = panel;
-
-        [VealixActions refreshLocalization];
-
-        NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
-        if (!observerToken) {
-            observerToken = [nc addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
-                if (vealixWindow) {
-                    vealixWindow.hidden = NO;
-                    [VealixActions updateLayoutForSize:vealixWindow.bounds.size];
-                }
-            }];
-        }
-    });
-}
-
-void __attribute__((constructor)) initVealixEngine() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        BuildVeaLixInterface();
-    });
-}
+        worldTabBtn.backgroundColor = [UIColor
